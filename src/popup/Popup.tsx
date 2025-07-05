@@ -1,37 +1,72 @@
 import React, { useEffect, useState } from 'react'
 
-const LANGUAGES = ['C++', 'Python', 'JavaScript', 'Java', 'C']
+const LANGUAGES = [
+  'C++',
+  'Python',
+  'JavaScript',
+  'Java',
+  'C',
+  'Go',
+  'Rust',
+] as const
 
-// Detect if current page is a coding platform
+// Types
+type Language = (typeof LANGUAGES)[number]
+type ProblemInfo = {
+  title: string
+  difficulty: string
+  tags: string[]
+}
+
+// Platform detection and parsing utilities
 const detectCodingPlatform = (url: string) => {
-  return /leetcode\.com|geeksforgeeks\.org|codingninjas\.com|codeforces\.com|codechef\.com/i.test(
+  return /leetcode\.com|geeksforgeeks\.org|codingninjas\.com|codeforces\.com|codechef\.com|hackerrank\.com|atcoder\.jp/i.test(
     url
   )
 }
 
-// Extract problem name from different platforms
-const extractProblemName = (url: string, pageText: string) => {
+const extractProblemInfo = (url: string, html: string): ProblemInfo => {
+  let title = 'Coding Problem'
+  let difficulty = ''
+  let tags: string[] = []
+
   if (url.includes('leetcode.com')) {
-    const match = pageText.match(/(\d+\.\s*[^\\n]+)/)
-    return match ? match[1] : 'LeetCode Problem'
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    if (titleMatch) {
+      title = titleMatch[1].replace(' - LeetCode', '').trim()
+    }
+
+    // Extract difficulty
+    const difficultyMatch = html.match(/difficulty[^>]*>([^<]*)</i)
+    if (difficultyMatch) {
+      difficulty = difficultyMatch[1].trim()
+    }
+
+    // Extract tags
+    const tagMatches = html.matchAll(/data-cy="topic-tag"[^>]*>([^<]*)</gi)
+    tags = Array.from(tagMatches)
+      .map((match) => match[1].trim())
+      .slice(0, 3)
   } else if (url.includes('geeksforgeeks.org')) {
-    const match = pageText.match(/Problem\s*:\s*([^\\n]+)/)
-    return match ? match[1] : 'GeeksForGeeks Problem'
+    const titleMatch = html.match(/<h1[^>]*>([^<]*)<\/h1>/i)
+    if (titleMatch) {
+      title = titleMatch[1].trim()
+    }
   } else if (url.includes('codeforces.com')) {
-    const match = pageText.match(/([A-Z]\.\s*[^\\n]+)/)
-    return match ? match[1] : 'Codeforces Problem'
-  } else if (url.includes('codechef.com')) {
-    const match = pageText.match(/Problem\s*Code\s*:\s*([^\\n]+)/)
-    return match ? match[1] : 'CodeChef Problem'
+    const titleMatch = html.match(/<div[^>]*class="title"[^>]*>([^<]*)<\/div>/i)
+    if (titleMatch) {
+      title = titleMatch[1].trim()
+    }
   }
-  return 'Coding Problem'
+
+  return { title, difficulty, tags }
 }
 
-// Default boilerplates for different languages
-const getDefaultBoilerplate = (language: string) => {
-  switch (language) {
-    case 'C++':
-      return `#include <bits/stdc++.h>
+// Language-specific boilerplates
+const getDefaultBoilerplate = (language: Language): string => {
+  const boilerplates: Record<Language, string> = {
+    'C++': `#include <bits/stdc++.h>
 using namespace std;
 
 class Solution {
@@ -48,27 +83,24 @@ int main() {
     // Driver code will be generated here
     
     return 0;
-}`
-    case 'Python':
-      return `class Solution:
+}`,
+    Python: `class Solution:
     def solution_function(self):
         # Your solution here
         pass
 
 if __name__ == "__main__":
     sol = Solution()
-    # Driver code will be generated here`
-    case 'JavaScript':
-      return `class Solution {
+    # Driver code will be generated here`,
+    JavaScript: `class Solution {
     solutionFunction() {
         // Your solution here
     }
 }
 
 // Driver code will be generated here
-const sol = new Solution();`
-    case 'Java':
-      return `import java.util.*;
+const sol = new Solution();`,
+    Java: `import java.util.*;
 import java.io.*;
 
 class Solution {
@@ -83,9 +115,8 @@ public class Main {
         Solution sol = new Solution();
         // Driver code will be generated here
     }
-}`
-    case 'C':
-      return `#include <stdio.h>
+}`,
+    C: `#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -94,64 +125,114 @@ public class Main {
 int main() {
     // Driver code will be generated here
     return 0;
-}`
-    default:
-      return ''
+}`,
+    Go: `package main
+
+import (
+    "fmt"
+)
+
+// Your solution function here
+
+func main() {
+    // Driver code will be generated here
+}`,
+    Rust: `use std::io;
+
+// Your solution function here
+
+fn main() {
+    // Driver code will be generated here
+}`,
   }
+
+  return boilerplates[language] || ''
 }
 
-// Generate prompt for extracting function
-const generateExtractPrompt = (code: string, language: string) => {
-  return `Given this ${language} code with driver code and solution implementation:
+// AI prompt generators
+const generateDriverPrompt = (
+  html: string,
+  language: Language,
+  boilerplate: string
+) => {
+  return `Analyze this complete HTML page from a competitive programming website:
+
+"""
+${html}
+"""
+
+Based on the problem description, constraints, examples, and input/output format found in the HTML:
+
+1. Generate complete driver code in ${language} using this boilerplate structure:
+${boilerplate}
+
+2. Create proper input/output handling based on the exact format specified in the problem
+3. Handle multiple test cases if mentioned
+4. Parse input correctly according to the problem's input format
+5. Call the solution function with appropriate parameters
+6. Output results in the exact format required
+
+IMPORTANT:
+- DO NOT implement the solution logic - leave solution functions empty with "// Your solution here"
+- Extract input/output format from the HTML content
+- Handle edge cases mentioned in constraints
+- if '[]', ',' are there in the input , include them as part of the input and then extract the input 
+- For competitive programming, optimize for speed (fast I/O in C++)
+- Return only the complete code without markdown formatting
+- Make sure the code compiles and runs correctly
+
+Provide only the complete working code with proper input/output handling.`
+}
+
+const generateExtractPrompt = (code: string, language: Language) => {
+  return `Extract the submittable solution from this ${language} code:
 
 """
 ${code}
 """
 
-Please extract ONLY the following for ${language} competitive programming submission:
+Extract ONLY:
 1. Solution class/function with all implemented methods
-2. Any helper functions or classes that are part of the solution
-3. Global variables or constants used by the solution (if any)
-4. Remove all main function, driver code, input/output handling, and test cases
+2. Helper functions that are part of the solution
+3. Required imports/headers for the solution
+4. Global variables/constants used by solution
 
-IMPORTANT:
-- Keep the solution logic intact
-- Maintain proper class structure if applicable
-- Include necessary imports/headers for the solution only
-- Do not include any main function or driver code
-- Do not wrap the code in markdown code blocks (no \`\`\`${language.toLowerCase()} or \`\`\`)
-- Return clean, submittable code only
+REMOVE:
+- Main function and driver code
+- Input/output handling
+- Test cases and debugging code
+- Comments about driver code
 
-Only return the extracted solution code, no explanation.`
+Return clean, submittable code that can be directly pasted into online judges.
+Do not include markdown formatting - return plain code only.`
 }
 
-// Extract function using Gemini AI
-const extractFunctionWithAI = async (
-  code: string,
-  language: string,
-  apiKey: string
-) => {
-  const prompt = generateExtractPrompt(code, language)
-
+// API utilities
+const callGeminiAPI = async (prompt: string, apiKey: string) => {
   try {
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
-        apiKey,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            topP: 0.8,
+            topK: 10,
+            maxOutputTokens: 2048,
+          },
+        }),
       }
     )
 
     const data = await response.json()
     let text =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      'Error extracting function.'
+      'Error generating response.'
 
-    // Clean up markdown code fences if present
+    // Clean up markdown formatting
     text = text
       .replace(/^```\w*\n?/, '')
       .replace(/\n?```$/, '')
@@ -159,585 +240,709 @@ const extractFunctionWithAI = async (
 
     return text
   } catch (error) {
-    return 'Error: Failed to extract function. Please check your API key and try again.'
+    console.error('Gemini API Error:', error)
+    return 'Error: Failed to connect to Gemini API. Please check your API key and connection.'
   }
 }
 
+// Custom hooks
+const useLocalStorage = (key: string, defaultValue: any) => {
+  const [value, setValue] = useState(defaultValue)
+
+  useEffect(() => {
+    chrome.storage.local.get([key], (result) => {
+      if (result[key] !== undefined) {
+        setValue(result[key])
+      }
+    })
+  }, [key])
+
+  const updateValue = (newValue: any) => {
+    setValue(newValue)
+    chrome.storage.local.set({ [key]: newValue })
+  }
+
+  return [value, updateValue]
+}
+
+const useCurrentTab = () => {
+  const [tab, setTab] = useState<chrome.tabs.Tab | null>(null)
+
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      setTab(tabs[0] || null)
+    })
+  }, [])
+
+  return tab
+}
+
+// UI Components
+const Button = ({
+  children,
+  onClick,
+  disabled = false,
+  variant = 'primary',
+  size = 'md',
+  className = '',
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'ghost'
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}) => {
+  const baseClasses =
+    'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2'
+
+  const variants = {
+    primary:
+      'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-sm',
+    secondary:
+      'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500 shadow-sm',
+    danger:
+      'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm',
+    success:
+      'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 shadow-sm',
+    ghost:
+      'text-blue-600 hover:text-blue-700 hover:bg-blue-50 focus:ring-blue-500',
+  }
+
+  const sizes = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base',
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${
+        disabled ? 'opacity-50 cursor-not-allowed' : ''
+      } ${className}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+const Input = ({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder = '',
+  className = '',
+}: {
+  label?: string
+  value: string
+  onChange: (value: string) => void
+  type?: string
+  placeholder?: string
+  className?: string
+}) => (
+  <div className={className}>
+    {label && (
+      <label className='block text-sm font-medium text-gray-700 mb-1'>
+        {label}
+      </label>
+    )}
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm'
+    />
+  </div>
+)
+
+const Select = ({
+  label,
+  value,
+  onChange,
+  options,
+  className = '',
+}: {
+  label?: string
+  value: string
+  onChange: (value: string) => void
+  options: readonly string[]
+  className?: string
+}) => (
+  <div className={className}>
+    {label && (
+      <label className='block text-sm font-medium text-gray-700 mb-1'>
+        {label}
+      </label>
+    )}
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm'
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  </div>
+)
+
+const Textarea = ({
+  label,
+  value,
+  onChange,
+  placeholder = '',
+  rows = 4,
+  readOnly = false,
+  className = '',
+}: {
+  label?: string
+  value: string
+  onChange?: (value: string) => void
+  placeholder?: string
+  rows?: number
+  readOnly?: boolean
+  className?: string
+}) => (
+  <div className={className}>
+    {label && (
+      <label className='block text-sm font-medium text-gray-700 mb-1'>
+        {label}
+      </label>
+    )}
+    <textarea
+      value={value}
+      onChange={readOnly ? undefined : (e) => onChange?.(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      readOnly={readOnly}
+      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-none ${
+        readOnly ? 'bg-gray-50' : ''
+      }`}
+    />
+  </div>
+)
+
+const Card = ({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode
+  className?: string
+}) => (
+  <div
+    className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 ${className}`}
+  >
+    {children}
+  </div>
+)
+
+const Badge = ({
+  children,
+  variant = 'default',
+}: {
+  children: React.ReactNode
+  variant?: 'default' | 'success' | 'warning' | 'error'
+}) => {
+  const variants = {
+    default: 'bg-gray-100 text-gray-800',
+    success: 'bg-green-100 text-green-800',
+    warning: 'bg-yellow-100 text-yellow-800',
+    error: 'bg-red-100 text-red-800',
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[variant]}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+const LoadingSpinner = () => (
+  <div className='flex items-center justify-center'>
+    <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600'></div>
+  </div>
+)
+
+// Main component
 export default function Popup() {
   const [step, setStep] = useState<
     'intro' | 'boilerplate' | 'generate' | 'extract' | 'settings'
   >('intro')
-  const [apiKey, setApiKey] = useState('')
-  const [customBoilerplate, setCustomBoilerplate] = useState('')
-  const [language, setLanguage] = useState('C++')
+  const [isLoading, setIsLoading] = useState(false)
+  const [language, setLanguage] = useState<Language>('C++')
+  const [problemInfo, setProblemInfo] = useState<ProblemInfo>({
+    title: '',
+    difficulty: '',
+    tags: [],
+  })
+
+  // Local storage hooks
+  const [apiKey, setApiKey] = useLocalStorage('geminiApiKey', '')
+  const [customBoilerplate, setCustomBoilerplate] = useLocalStorage(
+    'customBoilerplate',
+    ''
+  )
+  const [hasSeenIntro, setHasSeenIntro] = useLocalStorage('hasSeenIntro', false)
+
+  // State for generated/extracted code
   const [driverCode, setDriverCode] = useState('')
   const [extractCode, setExtractCode] = useState('')
   const [extractedFunction, setExtractedFunction] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentUrl, setCurrentUrl] = useState('')
-  const [problemName, setProblemName] = useState('')
-  const [previousStep, setPreviousStep] = useState<'generate' | 'extract'>(
-    'generate'
-  )
 
-  // Initialize popup state
+  const currentTab = useCurrentTab()
+  const isPlatformPage = currentTab
+    ? detectCodingPlatform(currentTab.url || '')
+    : false
+
+  // Initialize popup
   useEffect(() => {
-    // Get current tab URL
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const url = tabs[0]?.url || ''
-      setCurrentUrl(url)
-    })
-
-    // Load saved data
-    chrome.storage.local.get(
-      ['hasSeenIntro', 'geminiApiKey', 'customBoilerplate'],
-      (result) => {
-        if (result.hasSeenIntro) {
-          // User has seen intro, determine which screen to show
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const url = tabs[0]?.url || ''
-            if (detectCodingPlatform(url)) {
-              setStep('generate')
-              setPreviousStep('generate')
-            } else {
-              setStep('extract')
-              setPreviousStep('extract')
-            }
-          })
-        }
-
-        if (result.geminiApiKey) setApiKey(result.geminiApiKey)
-        if (result.customBoilerplate)
-          setCustomBoilerplate(result.customBoilerplate)
-      }
-    )
-  }, [])
-
-  // Save intro completion and move to boilerplate
-  const finishIntro = () => {
-    if (!apiKey.trim()) {
-      alert('Please enter your Gemini API key')
-      return
+    if (hasSeenIntro) {
+      setStep(isPlatformPage ? 'generate' : 'extract')
     }
+  }, [hasSeenIntro, isPlatformPage])
 
-    chrome.storage.local.set({ geminiApiKey: apiKey }, () => {
-      setStep('boilerplate')
-    })
-  }
-
-  // Save boilerplate and finish setup
-  const finishBoilerplate = () => {
-    const boilerplateToSave =
-      customBoilerplate || getDefaultBoilerplate(language)
-
-    chrome.storage.local.set(
-      {
-        customBoilerplate: boilerplateToSave,
-        hasSeenIntro: true,
-      },
-      () => {
-        // Determine next screen based on current page
-        if (detectCodingPlatform(currentUrl)) {
-          setStep('generate')
-          setPreviousStep('generate')
-        } else {
-          setStep('extract')
-          setPreviousStep('extract')
-        }
-      }
-    )
-  }
-
-  // Open settings screen
-  const openSettings = () => {
-    setStep('settings')
-  }
-
-  // Generate prompt for driver code
-  const generatePrompt = (
-    lang: string,
-    problem: string,
-    boilerplate: string
-  ) => {
-    return `Given this problem description:
-
-"""
-${problem}
-"""
-
-Please generate driver code in ${lang} that:
-1. Uses this boilerplate structure:
-${boilerplate}
-
-2. Creates appropriate input/output handling for the problem
-3. Calls the solution function with proper parameters
-4. Handles multiple test cases if needed
-5. For C++, include common competitive programming headers like bits/stdc++.h
-
-IMPORTANT: 
-- DO NOT implement the actual solution logic
-- Leave the solution function empty with a comment "// Your solution here"
-- Only provide the driver code with input/output handling
-- Do not wrap the code in markdown code blocks (no \`\`\`cpp or \`\`\`)
-- Return plain code only without any markdown formatting
-
-Only return the complete driver code structure, no explanation.`
+  // Copy to clipboard utility
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      // You could add a toast notification here
+      alert('✅ Copied to clipboard!')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+      alert('❌ Failed to copy to clipboard')
+    }
   }
 
   // Generate driver code
   const handleGenerate = async () => {
+    if (!currentTab?.id) return
+
     setIsLoading(true)
 
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: tab.id! },
-        func: () => document.body.innerText,
-      },
-      async (results) => {
-        const problemText =
-          results?.[0]?.result?.slice(0, 3000) || 'Problem text not found.'
-        const extractedProblemName = extractProblemName(currentUrl, problemText)
-        setProblemName(extractedProblemName)
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: currentTab.id },
+        func: () => document.documentElement.outerHTML,
+      })
 
-        const boilerplate = customBoilerplate || getDefaultBoilerplate(language)
-        const prompt = generatePrompt(language, problemText, boilerplate)
+      const html = result.result
+      const currentUrl = currentTab.url || ''
+      const info = extractProblemInfo(currentUrl, `${html}`)
+      setProblemInfo(info)
 
-        try {
-          const response = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
-              apiKey,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-              }),
-            }
-          )
+      const boilerplate = customBoilerplate || getDefaultBoilerplate(language)
+      const prompt = generateDriverPrompt(`${html}`, language, boilerplate)
 
-          const data = await response.json()
-          let text =
-            data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-            'Error generating code.'
-
-          // Clean up markdown code fences if present
-          text = text
-            .replace(/^```\w*\n?/, '')
-            .replace(/\n?```$/, '')
-            .trim()
-
-          setDriverCode(text)
-        } catch (error) {
-          setDriverCode(
-            'Error: Failed to generate code. Please check your API key.'
-          )
-        }
-
-        setIsLoading(false)
-      }
-    )
+      const code = await callGeminiAPI(prompt, apiKey)
+      setDriverCode(code)
+    } catch (error) {
+      console.error('Generate error:', error)
+      setDriverCode('Error: Failed to generate driver code. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // Extract function from pasted code using AI
+  // Extract function
   const handleExtract = async () => {
     if (!extractCode.trim()) {
       alert('Please paste your code first')
       return
     }
 
-    if (!apiKey.trim()) {
-      alert('Please set your Gemini API key in settings')
-      return
-    }
-
     setIsLoading(true)
-    const extracted = await extractFunctionWithAI(extractCode, language, apiKey)
-    setExtractedFunction(extracted)
-    setIsLoading(false)
-  }
 
-  // Copy to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('✅ Copied to clipboard!')
-    })
-  }
-
-  // Save settings
-  const saveSettings = () => {
-    const boilerplateToSave =
-      customBoilerplate || getDefaultBoilerplate(language)
-
-    chrome.storage.local.set(
-      {
-        geminiApiKey: apiKey,
-        customBoilerplate: boilerplateToSave,
-      },
-      () => {
-        alert('✅ Settings saved!')
-        setStep(previousStep)
-      }
-    )
-  }
-
-  // Reset all data
-  const resetAllData = () => {
-    if (
-      confirm(
-        'Are you sure you want to reset all data? This will clear your API key and custom boilerplate.'
+    try {
+      const prompt = generateExtractPrompt(extractCode, language)
+      const extracted = await callGeminiAPI(prompt, apiKey)
+      setExtractedFunction(extracted)
+    } catch (error) {
+      console.error('Extract error:', error)
+      setExtractedFunction(
+        'Error: Failed to extract function. Please try again.'
       )
-    ) {
-      chrome.storage.local.clear(() => {
-        setApiKey('')
-        setCustomBoilerplate('')
-        setStep('intro')
-        alert('✅ All data reset!')
-      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // Render intro screen
+  // Setup completion
+  const completeSetup = () => {
+    setHasSeenIntro(true)
+    setStep(isPlatformPage ? 'generate' : 'extract')
+  }
+
+  // Render functions
   const renderIntro = () => (
-    <div className='space-y-4'>
+    <div className='space-y-6'>
       <div className='text-center'>
-        <h1 className='text-xl font-bold mb-2'>🚀 Welcome to LeetVSCode!</h1>
-        <p className='text-sm text-gray-600 mb-4'>
+        <div className='text-4xl mb-3'>🚀</div>
+        <h1 className='text-xl font-bold text-gray-900 mb-2'>
+          Welcome to LeetVSCode!
+        </h1>
+        <p className='text-sm text-gray-600'>
           Your ultimate coding companion for competitive programming
         </p>
       </div>
 
-      <div className='bg-blue-50 p-3 rounded border-l-4 border-blue-500'>
-        <h3 className='font-semibold text-blue-700 mb-1'>📖 Learn More</h3>
-        <a
-          href='https://example.com/leetvscode-intro'
-          target='_blank'
-          className='text-blue-600 underline text-sm'
-        >
-          Read our introduction blog →
-        </a>
-      </div>
-
-      <div>
-        <label className='block mb-2 font-medium'>🔐 Gemini API Key:</label>
-        <input
-          type='password'
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder='Enter your Gemini API key'
-          className='w-full border rounded px-3 py-2 text-sm'
-        />
-        <div className='mt-2 text-xs text-gray-600'>
-          <p>
-            •{' '}
+      <Card className='bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'>
+        <div className='flex items-start space-x-3'>
+          <div className='text-blue-600 text-xl'>💡</div>
+          <div>
+            <h3 className='font-semibold text-blue-900 mb-1'>
+              Getting Started
+            </h3>
+            <p className='text-sm text-blue-700 mb-2'>
+              LeetVSCode helps you generate driver code and extract solutions
+              seamlessly.
+            </p>
             <a
               href='https://makersuite.google.com/app/apikey'
               target='_blank'
-              className='text-blue-600 underline'
+              className='text-blue-600 hover:text-blue-800 text-sm underline'
             >
-              Get your FREE Gemini API key here →
+              Get your FREE Gemini API key →
             </a>
-          </p>
-          <p>• Your key stays local and is never sent to us</p>
-          <p>• Completely free with generous usage limits</p>
+          </div>
         </div>
+      </Card>
+
+      <Input
+        label='🔐 Gemini API Key'
+        type='password'
+        value={apiKey}
+        onChange={setApiKey}
+        placeholder='Enter your Gemini API key'
+      />
+
+      <div className='text-xs text-gray-500 space-y-1'>
+        <p>• Your API key is stored locally and never shared</p>
+        <p>• Free tier includes generous usage limits</p>
+        <p>• Required for AI-powered code generation</p>
       </div>
 
-      <button
-        onClick={finishIntro}
-        className='w-full bg-green-600 text-white py-2 rounded font-medium hover:bg-green-700'
+      <Button
+        onClick={() => setStep('boilerplate')}
+        disabled={!apiKey.trim()}
+        className='w-full'
+        variant='success'
       >
         Next: Setup Boilerplate →
-      </button>
+      </Button>
     </div>
   )
 
-  // Render boilerplate screen
   const renderBoilerplate = () => (
-    <div className='space-y-4'>
+    <div className='space-y-6'>
       <div className='text-center'>
-        <h1 className='text-xl font-bold mb-2'>⚙️ Custom Boilerplate</h1>
+        <div className='text-3xl mb-3'>⚙️</div>
+        <h1 className='text-xl font-bold text-gray-900 mb-2'>
+          Customize Boilerplate
+        </h1>
         <p className='text-sm text-gray-600'>
-          Customize your default code template (optional)
+          Set up your preferred code template (optional)
         </p>
       </div>
 
-      <div>
-        <label className='block mb-2 font-medium'>🧪 Language:</label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className='w-full border rounded px-3 py-2 text-sm'
+      <Select
+        label='🧪 Programming Language'
+        value={language}
+        onChange={(value) => setLanguage(value as Language)}
+        options={LANGUAGES}
+      />
+
+      <Textarea
+        label='📝 Custom Boilerplate'
+        value={customBoilerplate}
+        onChange={setCustomBoilerplate}
+        placeholder={`Leave empty to use default template:\n\n${getDefaultBoilerplate(
+          language
+        )}`}
+        rows={8}
+      />
+
+      <div className='text-xs text-gray-500'>
+        💡 Leave empty to use our optimized templates with competitive
+        programming headers
+      </div>
+
+      <div className='flex space-x-3'>
+        <Button
+          onClick={() => setStep('intro')}
+          variant='ghost'
+          className='flex-1'
         >
-          {LANGUAGES.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
+          ← Back
+        </Button>
+        <Button onClick={completeSetup} variant='success' className='flex-1'>
+          Start Coding! 🎯
+        </Button>
       </div>
-
-      <div>
-        <label className='block mb-2 font-medium'>📝 Your Boilerplate:</label>
-        <textarea
-          value={customBoilerplate}
-          onChange={(e) => setCustomBoilerplate(e.target.value)}
-          placeholder={`Leave empty to use default template:\n\n${getDefaultBoilerplate(
-            language
-          )}`}
-          className='w-full border rounded px-3 py-2 text-xs font-mono h-48'
-        />
-        <p className='text-xs text-gray-600 mt-1'>
-          Leave empty to use our optimized template with competitive programming
-          headers
-        </p>
-      </div>
-
-      <button
-        onClick={finishBoilerplate}
-        className='w-full bg-green-600 text-white py-2 rounded font-medium hover:bg-green-700'
-      >
-        Save & Start Coding! 🎯
-      </button>
     </div>
   )
 
-  // Render generate screen
   const renderGenerate = () => (
-    <div className='space-y-4'>
+    <div className='space-y-6'>
       <div className='text-center'>
-        <h1 className='text-lg font-bold mb-1'>🔧 Generate Driver Code</h1>
-        {problemName && (
-          <p className='text-sm text-gray-600 bg-gray-50 p-2 rounded'>
-            📋 {problemName}
-          </p>
+        <div className='text-3xl mb-3'>🔧</div>
+        <h1 className='text-lg font-bold text-gray-900 mb-2'>
+          Generate Driver Code
+        </h1>
+
+        {problemInfo.title && (
+          <Card className='bg-gray-50 border-gray-200'>
+            <div className='space-y-2'>
+              <h3 className='font-semibold text-gray-900 text-sm'>
+                {problemInfo.title}
+              </h3>
+              <div className='flex flex-wrap gap-1'>
+                {problemInfo.difficulty && (
+                  <Badge
+                    variant={
+                      problemInfo.difficulty === 'Hard'
+                        ? 'error'
+                        : problemInfo.difficulty === 'Medium'
+                        ? 'warning'
+                        : 'success'
+                    }
+                  >
+                    {problemInfo.difficulty}
+                  </Badge>
+                )}
+                {problemInfo.tags.map((tag) => (
+                  <Badge key={tag} variant='default'>
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </Card>
         )}
-        <button
-          onClick={openSettings}
-          className='text-xs text-blue-600 underline hover:text-blue-800'
-        >
+
+        <Button onClick={() => setStep('settings')} variant='ghost' size='sm'>
           ⚙️ Settings
-        </button>
+        </Button>
       </div>
 
-      <div>
-        <label className='block mb-2 font-medium'>🧪 Language:</label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className='w-full border rounded px-3 py-2 text-sm'
-        >
-          {LANGUAGES.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label='🧪 Language'
+        value={language}
+        onChange={(value) => setLanguage(value as Language)}
+        options={LANGUAGES}
+      />
 
-      <button
+      <Button
         onClick={handleGenerate}
-        disabled={isLoading}
-        className='w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 disabled:bg-gray-400'
+        disabled={isLoading || !apiKey}
+        className='w-full'
+        variant='primary'
       >
-        {isLoading ? '⏳ Generating...' : '🚀 Generate Driver Code'}
-      </button>
+        {isLoading ? (
+          <div className='flex items-center justify-center space-x-2'>
+            <LoadingSpinner />
+            <span>Generating...</span>
+          </div>
+        ) : (
+          '🚀 Generate Driver Code'
+        )}
+      </Button>
 
       {driverCode && (
-        <div className='space-y-2'>
-          <h3 className='font-semibold'>📄 Generated Code:</h3>
-          <textarea
-            value={driverCode}
-            readOnly
-            className='w-full border rounded px-3 py-2 text-xs font-mono h-48 bg-gray-50'
-          />
-          <button
-            onClick={() => copyToClipboard(driverCode)}
-            className='w-full bg-gray-800 text-white py-2 rounded font-medium hover:bg-gray-900'
-          >
-            📋 Copy to Clipboard
-          </button>
-        </div>
+        <Card>
+          <div className='space-y-3'>
+            <h3 className='font-semibold text-gray-900 flex items-center'>
+              <span className='mr-2'>📄</span>
+              Generated Code
+            </h3>
+            <Textarea value={driverCode} readOnly rows={12} />
+            <Button
+              onClick={() => copyToClipboard(driverCode)}
+              variant='secondary'
+              className='w-full'
+            >
+              📋 Copy to Clipboard
+            </Button>
+          </div>
+        </Card>
       )}
 
-      <div className='text-center pt-2 border-t'>
-        <button
-          onClick={() => setStep('extract')}
-          className='text-blue-600 text-sm underline'
-        >
-          Need to extract function? Click here →
-        </button>
+      <div className='text-center pt-4 border-t border-gray-200'>
+        <Button onClick={() => setStep('extract')} variant='ghost' size='sm'>
+          Need to extract function? →
+        </Button>
       </div>
     </div>
   )
 
-  // Render extract screen
   const renderExtract = () => (
-    <div className='space-y-4'>
+    <div className='space-y-6'>
       <div className='text-center'>
-        <h1 className='text-lg font-bold mb-1'>🔍 Extract Function</h1>
+        <div className='text-3xl mb-3'>🔍</div>
+        <h1 className='text-lg font-bold text-gray-900 mb-2'>
+          Extract Function
+        </h1>
         <p className='text-sm text-gray-600'>
-          Paste your VS Code solution to extract submittable function
+          Paste your VS Code solution to extract submittable code
         </p>
-        <button
-          onClick={openSettings}
-          className='text-xs text-blue-600 underline hover:text-blue-800'
-        >
+
+        <Button onClick={() => setStep('settings')} variant='ghost' size='sm'>
           ⚙️ Settings
-        </button>
+        </Button>
       </div>
 
-      <div>
-        <label className='block mb-2 font-medium'>🧪 Language:</label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className='w-full border rounded px-3 py-2 text-sm'
-        >
-          {LANGUAGES.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label='🧪 Language'
+        value={language}
+        onChange={(value) => setLanguage(value as Language)}
+        options={LANGUAGES}
+      />
 
-      <div>
-        <label className='block mb-2 font-medium'>
-          📝 Your VS Code Solution:
-        </label>
-        <textarea
-          value={extractCode}
-          onChange={(e) => setExtractCode(e.target.value)}
-          placeholder='Paste your complete VS Code solution here...'
-          className='w-full border rounded px-3 py-2 text-xs font-mono h-32'
-        />
-      </div>
+      <Textarea
+        label='📝 Your VS Code Solution'
+        value={extractCode}
+        onChange={setExtractCode}
+        placeholder='Paste your complete VS Code solution here...'
+        rows={6}
+      />
 
-      <button
+      <Button
         onClick={handleExtract}
-        disabled={isLoading}
-        className='w-full bg-purple-600 text-white py-2 rounded font-medium hover:bg-purple-700 disabled:bg-gray-400'
+        disabled={isLoading || !apiKey || !extractCode.trim()}
+        className='w-full'
+        variant='primary'
       >
-        {isLoading ? '⏳ Extracting...' : '🔍 Extract Function'}
-      </button>
+        {isLoading ? (
+          <div className='flex items-center justify-center space-x-2'>
+            <LoadingSpinner />
+            <span>Extracting...</span>
+          </div>
+        ) : (
+          '🔍 Extract Function'
+        )}
+      </Button>
 
       {extractedFunction && (
-        <div className='space-y-2'>
-          <h3 className='font-semibold'>✂️ Extracted Function:</h3>
-          <textarea
-            value={extractedFunction}
-            readOnly
-            className='w-full border rounded px-3 py-2 text-xs font-mono h-48 bg-gray-50'
-          />
-          <button
-            onClick={() => copyToClipboard(extractedFunction)}
-            className='w-full bg-gray-800 text-white py-2 rounded font-medium hover:bg-gray-900'
-          >
-            📋 Copy to Clipboard
-          </button>
-        </div>
+        <Card>
+          <div className='space-y-3'>
+            <h3 className='font-semibold text-gray-900 flex items-center'>
+              <span className='mr-2'>✂️</span>
+              Extracted Function
+            </h3>
+            <Textarea value={extractedFunction} readOnly rows={12} />
+            <Button
+              onClick={() => copyToClipboard(extractedFunction)}
+              variant='secondary'
+              className='w-full'
+            >
+              📋 Copy to Clipboard
+            </Button>
+          </div>
+        </Card>
       )}
 
-      <div className='text-center pt-2 border-t'>
-        <button
-          onClick={() => setStep('generate')}
-          className='text-blue-600 text-sm underline'
-        >
-          ← Back to Generate Driver Code
-        </button>
+      <div className='text-center pt-4 border-t border-gray-200'>
+        <Button onClick={() => setStep('generate')} variant='ghost' size='sm'>
+          ← Back to Generate
+        </Button>
       </div>
     </div>
   )
 
-  // Render settings screen
   const renderSettings = () => (
-    <div className='space-y-4'>
+    <div className='space-y-6'>
       <div className='text-center'>
-        <h1 className='text-lg font-bold mb-2'>⚙️ Settings</h1>
-        <p className='text-sm text-gray-600'>
-          Update your API key and boilerplate
-        </p>
+        <div className='text-3xl mb-3'>⚙️</div>
+        <h1 className='text-lg font-bold text-gray-900 mb-2'>Settings</h1>
+        <p className='text-sm text-gray-600'>Update your preferences</p>
       </div>
 
-      <div>
-        <label className='block mb-2 font-medium'>🔐 Gemini API Key:</label>
-        <input
-          type='password'
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder='Enter your Gemini API key'
-          className='w-full border rounded px-3 py-2 text-sm'
-        />
-      </div>
+      <Input
+        label='🔐 Gemini API Key'
+        type='password'
+        value={apiKey}
+        onChange={setApiKey}
+        placeholder='Enter your Gemini API key'
+      />
 
-      <div>
-        <label className='block mb-2 font-medium'>🧪 Language:</label>
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className='w-full border rounded px-3 py-2 text-sm'
-        >
-          {LANGUAGES.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label='🧪 Language'
+        value={language}
+        onChange={(value) => setLanguage(value as Language)}
+        options={LANGUAGES}
+      />
 
-      <div>
-        <label className='block mb-2 font-medium'>📝 Custom Boilerplate:</label>
-        <textarea
-          value={customBoilerplate}
-          onChange={(e) => setCustomBoilerplate(e.target.value)}
-          placeholder={`Leave empty to use default template:\n\n${getDefaultBoilerplate(
-            language
-          )}`}
-          className='w-full border rounded px-3 py-2 text-xs font-mono h-32'
-        />
-      </div>
+      <Textarea
+        label='📝 Custom Boilerplate'
+        value={customBoilerplate}
+        onChange={setCustomBoilerplate}
+        placeholder={`Default template:\n\n${getDefaultBoilerplate(language)}`}
+        rows={8}
+      />
 
-      <div className='space-y-2'>
-        <button
-          onClick={saveSettings}
-          className='w-full bg-green-600 text-white py-2 rounded font-medium hover:bg-green-700'
+      <div className='space-y-3'>
+        <Button
+          onClick={() => {
+            alert('✅ Settings saved!')
+            setStep(isPlatformPage ? 'generate' : 'extract')
+          }}
+          variant='success'
+          className='w-full'
         >
           💾 Save Settings
-        </button>
+        </Button>
 
-        <button
-          onClick={resetAllData}
-          className='w-full bg-red-600 text-white py-2 rounded font-medium hover:bg-red-700'
+        <Button
+          onClick={() => {
+            if (
+              confirm(
+                'Reset all data? This will clear your API key and custom boilerplate.'
+              )
+            ) {
+              chrome.storage.local.clear()
+              setApiKey('')
+              setCustomBoilerplate('')
+              setHasSeenIntro(false)
+              setStep('intro')
+              alert('✅ All data reset!')
+            }
+          }}
+          variant='danger'
+          className='w-full'
         >
           🗑️ Reset All Data
-        </button>
+        </Button>
       </div>
 
-      <div className='text-center pt-2 border-t'>
-        <button
-          onClick={() => setStep(previousStep)}
-          className='text-blue-600 text-sm underline'
+      <div className='text-center pt-4 border-t border-gray-200'>
+        <Button
+          onClick={() => setStep(isPlatformPage ? 'generate' : 'extract')}
+          variant='ghost'
+          size='sm'
         >
-          ← Back to {previousStep === 'generate' ? 'Generate' : 'Extract'}
-        </button>
+          ← Back
+        </Button>
       </div>
     </div>
   )
 
   return (
-    <div className='w-96 max-h-96 overflow-y-auto p-4 font-sans'>
-      {step === 'intro' && renderIntro()}
-      {step === 'boilerplate' && renderBoilerplate()}
-      {step === 'generate' && renderGenerate()}
-      {step === 'extract' && renderExtract()}
-      {step === 'settings' && renderSettings()}
-
-      <div className='text-center mt-4 pt-2 border-t text-xs text-gray-500'>
-        🙏 Hare Krishna! Made with devotion
+    <div className='w-96 max-h-[600px] overflow-y-auto bg-gray-50'>
+      <div className='p-4 space-y-4'>
+        {step === 'intro' && renderIntro()}
+        {step === 'boilerplate' && renderBoilerplate()}
+        {step === 'generate' && renderGenerate()}
+        {step === 'extract' && renderExtract()}
+        {step === 'settings' && renderSettings()}
       </div>
+
     </div>
   )
 }
