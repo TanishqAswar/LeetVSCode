@@ -1,0 +1,34 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+
+# Chrome Extension Packaging
+*.crx
+*.pem
+*.zip
+
+# TypeScript
+*.tsbuildinfo
+
+# VSCode Settings
+.vscode/
+*.code-workspace
+
+# OS / Misc
+.DS_Store
+Thumbs.db
+
+# dotenv / Secrets
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# Optional: Gemini API Key backup (if ever used)
+gemini-key.txt
