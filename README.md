@@ -46,4 +46,3 @@ A powerful Chrome extension that helps competitive programmers generate driver c
 ## License
 
 MIT License
-prabhu in our last chat you ga... - Claude

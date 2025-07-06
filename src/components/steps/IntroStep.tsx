@@ -16,7 +16,9 @@ export const IntroStep: React.FC<IntroStepProps> = ({
   return (
     <div className='space-y-6'>
       <div className='text-center'>
-        <div className='text-4xl mb-3'>🚀</div>
+        <div className='text-4xl mb-3'>
+          <img src='/icons/icon.png' alt='App Icon' className='w-10 h-10 ml-2' />
+        </div>
         <h1 className='text-xl font-bold text-gray-900 mb-2'>
           Welcome to LeetVSCode!
         </h1>
@@ -42,6 +44,14 @@ export const IntroStep: React.FC<IntroStepProps> = ({
               className='text-blue-600 hover:text-blue-800 text-sm underline'
             >
               Get your FREE Gemini API key →
+            </a>
+            <br />
+            <a
+              href='https://youtube.com/shorts/gimu4UFFMnM?si=pKyyE-neJGWwLhKN'
+              target='_blank'
+              className='text-blue-600 hover:text-blue-800 text-sm underline'
+            >
+              Video Tutorial →
             </a>
           </div>
         </div>

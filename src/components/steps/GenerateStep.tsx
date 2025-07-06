@@ -1,5 +1,5 @@
 // src/components/steps/GenerateStep.tsx
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Button,
   Select,
@@ -34,12 +34,13 @@ export const GenerateStep: React.FC<GenerateStepProps> = ({
   onSettings,
   onExtract,
 }) => {
+  const [copyState, setCopyState] = useState('copy')
+
   return (
     <div className='space-y-6'>
       <div className='text-center'>
-        <div className='text-3xl mb-3'>🔧</div>
-        <h1 className='text-lg font-bold text-gray-900 mb-2'>
-          Generate Driver Code
+        <h1 className='text-lg font-bold text-gray-900 mb-2 mt-5'>
+          🔧 Generate Driver Code
         </h1>
 
         {problemInfo.title && (
@@ -102,21 +103,35 @@ export const GenerateStep: React.FC<GenerateStepProps> = ({
 
       {driverCode && (
         <Card>
-          <div className='space-y-3'>
-            <h3 className='font-semibold text-gray-900 flex items-center'>
+          <div className='flex items-center gap-4 mb-3'>
+            <h3 className='font-semibold text-gray-900 flex items-center flex-1'>
               <span className='mr-2'>📄</span>
               Generated Code
             </h3>
-            <Textarea value={driverCode} readOnly rows={12} />
             <Button
-              onClick={() => copyToClipboard(driverCode)}
+              onClick={async () => {
+                setCopyState('copying')
+                await copyToClipboard(driverCode)
+                setCopyState('copied')
+                setTimeout(() => setCopyState('copy'), 2000)
+              }}
               variant='secondary'
-              className='w-full'
+              disabled={
+                !driverCode ||
+                driverCode.trim() === '' ||
+                copyState === 'copying'
+              }
             >
-              📋 Copy to Clipboard
+              {copyState === 'copying'
+                ? '⏳ Copying...'
+                : copyState === 'copied'
+                ? '✅ Copied!'
+                : '📋 Copy'}
             </Button>
           </div>
+          <Textarea value={driverCode} readOnly rows={12} />
         </Card>
+      
       )}
 
       <div className='text-center pt-4 border-t border-gray-200'>

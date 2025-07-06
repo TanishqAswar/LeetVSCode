@@ -24,11 +24,12 @@ TASK: Generate complete, working driver code in ${language} that:
 3. Calls the solution class/functions properly
 4. Produces the exact expected output format
 5. DO NOT IMPLEMENT THE SOLUTION, LEAVE THE SOLUTION FUNCTION EMPTY WITH COMMENT "Implement Here ... "
+6. **DECLARE ALL CLASSES/STRUCTS BEFORE THE MAIN FUNCTION AND HELPER FUNCTIONS**
 
 CRITICAL ANALYSIS STEPS:
 1. **Problem Type Detection**: 
    - Is this a class-based problem with operations? (like ["Constructor", "method1", "method2"])
-   - Is this a single function problem?
+   - Is this a single function problem? if yes, don't take test case input even if the boilerplate consists it
    - Are there multiple test cases?
 
 2. **Input Format Analysis**:
@@ -83,15 +84,17 @@ BOILERPLATE INTEGRATION:
 ${boilerplate}
 
 QUALITY REQUIREMENTS:
+- **Declare Solution class before any function that uses it**
 - Code must compile without errors
 - Handle all edge cases mentioned in constraints
 - Use efficient I/O (ios_base::sync_with_stdio(false) for C++)
-- Parse input exactly as shown in examples
+- Parse input 'exactly' as shown in examples
 - Output format must match expected output precisely
 - Handle empty arrays, negative numbers, large numbers
 - Memory management (delete objects if needed)
 
 COMMON PITFALLS TO AVOID:
+- **Don't place class declarations after functions that use them**
 - Don't overcomplicate parsing - use simple string operations
 - Don't assume input format - extract it from examples
 - Don't forget to handle the constructor as first operation
@@ -128,7 +131,7 @@ export const generateExtractPrompt = (
 ): string => {
   return `Extract the submittable solution from this ${language} code.
 
-TASK: Clean up driver code and extract ONLY the solution parts needed for online judge submission.
+TASK: Clean up driver code and extract ONLY the solution parts needed for online judge submission. Also, Don't Implement Your Own Solution, just extract the solution from the given code.
 
 INPUT CODE:
 """
@@ -144,6 +147,7 @@ KEEP (Solution Parts):
 - Global variables/constants used by the solution
 - Template definitions if used in solution
 - Typedef/using declarations for solution
+- Given Original Logic and don't implement yours' 
 
 REMOVE (Driver Parts):
 - main() function completely
@@ -155,6 +159,7 @@ REMOVE (Driver Parts):
 - Result formatting and output statements
 
 QUALITY CHECKS:
+- Do not include or implement your own solution
 - Ensure all solution methods are complete
 - Keep proper class structure
 - Maintain correct method signatures

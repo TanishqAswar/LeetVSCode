@@ -90,7 +90,7 @@ export const SettingsStep: React.FC<SettingsStepProps> = ({
         value={customBoilerplate}
         onChange={setCustomBoilerplate}
         placeholder={`Default template:\n\n${getDefaultBoilerplate(language)}`}
-        rows={8}
+        rows={6}
       />
 
       <div className='space-y-3'>

@@ -1,5 +1,6 @@
 // src/components/steps/ExtractStep.tsx (COMPLETED)
 import React from 'react'
+import { useState } from 'react'
 import { Button, Select, Card, Textarea, LoadingSpinner } from '../UIComponents'
 import { Language, LANGUAGES } from '../../types'
 import { copyToClipboard } from '../../utils/commonUtils'
@@ -28,7 +29,13 @@ export const ExtractStep: React.FC<ExtractStepProps> = ({
   onExtract,
   onSettings,
   onGenerate,
-}) => {
+  
+}
+
+) => {
+
+  const [copyState, setCopyState] = useState('copy')
+
   return (
     <div className='space-y-6'>
       <div className='text-center'>
@@ -78,18 +85,38 @@ export const ExtractStep: React.FC<ExtractStepProps> = ({
       {extractedFunction && (
         <Card>
           <div className='space-y-3'>
-            <h3 className='font-semibold text-gray-900 flex items-center'>
-              <span className='mr-2'>✂️</span>
-              Extracted Function
-            </h3>
-            <Textarea value={extractedFunction} readOnly rows={12} />
-            <Button
-              onClick={() => copyToClipboard(extractedFunction)}
-              variant='secondary'
-              className='w-full'
-            >
-              📋 Copy to Clipboard
-            </Button>
+            <div className='flex items-center gap-4 mb-3'>
+              <h3 className='font-semibold text-gray-900 flex items-center flex-1'>
+                <span className='mr-2'>✂️</span>
+                Extracted Function
+              </h3>
+              <Button
+                onClick={async () => {
+                  setCopyState('copying')
+                  await copyToClipboard(extractedFunction)
+                  setCopyState('copied')
+                  setTimeout(() => setCopyState('copy'), 2000)
+                }}
+                variant='secondary'
+                disabled={
+                  !extractedFunction ||
+                  extractedFunction.trim() === '' ||
+                  copyState === 'copying'
+                }
+              >
+                {copyState === 'copying'
+                  ? '⏳ Copying...'
+                  : copyState === 'copied'
+                  ? '✅ Copied!'
+                  : '📋 Copy'}
+              </Button>
+            </div>
+            <Textarea
+              value={extractedFunction || 'No function extracted yet...'}
+              readOnly
+              rows={12}
+              className={!extractedFunction ? 'text-gray-400' : ''}
+            />
           </div>
         </Card>
       )}
