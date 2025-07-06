@@ -1,19 +1,22 @@
 const path = require('path')
-const CopyPlugin = require('copy-webpack-plugin')
+const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 
 module.exports = {
   mode: 'development',
-  devtool: 'cheap-module-source-map',
+  devtool: 'cheap-module-source-map', // CSP-safe option
   entry: {
     popup: './src/popup/index.tsx',
-    content: './src/content/content.ts',
     background: './src/background/background.ts',
+    content: './src/content/content.ts',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
     clean: true,
+  },
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
   },
   module: {
     rules: [
@@ -24,24 +27,21 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
+        use: ['style-loader', 'css-loader', 'postcss-loader'],
       },
     ],
   },
-  resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
-  },
   plugins: [
-    new CopyPlugin({
-      patterns: [
-        { from: 'public', to: '.' },
-        { from: 'manifest.json', to: '.' },
-      ],
-    }),
     new HtmlWebpackPlugin({
-      template: 'src/popup/popup.html',
+      template: './public/popup.html',
       filename: 'popup.html',
       chunks: ['popup'],
+    }),
+    new CopyWebpackPlugin({
+      patterns: [
+        { from: './public/manifest.json', to: 'manifest.json' },
+        { from: './public/icons', to: 'icons' },
+      ],
     }),
   ],
 }

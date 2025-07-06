@@ -21,21 +21,21 @@
     "https://generativelanguage.googleapis.com/*"
   ],
   "action": {
-    "default_popup": "dist/popup.html",
+    "default_popup": "popup.html",
     "default_title": "LeetVSCode",
     "default_icon": {
-      "16": "dist/icons/icon.png",
-      "48": "dist/icons/icon.png",
-      "128": "dist/icons/icon.png"
+      "16": "icons/icon.png",
+      "48": "icons/icon.png",
+      "128": "icons/icon.png"
     }
   },
   "icons": {
-    "16": "dist/icons/icon.png",
-    "48": "dist/icons/icon.png",
-    "128": "dist/icons/icon.png"
+    "16": "icons/icon.png",
+    "48": "icons/icon.png",
+    "128": "icons/icon.png"
   },
   "background": {
-    "service_worker": "dist/background.js"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
@@ -54,7 +54,7 @@
         "https://www.hackerrank.com/*",
         "https://atcoder.jp/*"
       ],
-      "js": ["dist/content.js"]
+      "js": ["content.js"]
     }
   ],
   "content_security_policy": {

@@ -4,19 +4,20 @@ using namespace std;
 class Solution
 {
 public:
-    int findLucky(vector<int> &arr)
+    string longestCommonPrefix(vector<string> S)
     {
-        vector<int> count(arr.size() + 1);
-
-        for (const int a : arr)
-            if (a <= arr.size())
-                ++count[a];
-
-        for (int i = arr.size(); i >= 1; --i)
-            if (count[i] == i)
-                return i;
-
-        return -1;
+        if (S.size() == 0)
+            return "";
+        for (int i = 0; i < S[0].length(); i++)
+        {
+            char c = S[0][i];
+            for (int j = 1; j < S.size(); j++)
+            {
+                if (i == S[j].length() || S[j][i] != c)
+                    return S[0].substr(0, i);
+            }
+        }
+        return S[0];
     }
 };
 
@@ -26,17 +27,27 @@ int main()
     cin.tie(NULL);
 
     Solution sol;
+    string line;
 
-    int n;
-    cin >> n;
+    getline(cin, line);
 
-    vector<int> arr(n);
-    for (int i = 0; i < n; ++i)
+    vector<string> strs;
+    size_t pos = 0;
+    string token;
+
+    while ((pos = line.find("\"")) != string::npos)
     {
-        cin >> arr[i];
+        line.erase(0, pos + 1);
+        pos = line.find("\"");
+        token = line.substr(0, pos);
+        strs.push_back(token);
+        line.erase(0, pos + 1);
+        if (line.find(",") == string::npos)
+            break;
+        line.erase(0, 1);
     }
 
-    cout << sol.findLucky(arr) << endl;
+    cout << "\"" << sol.longestCommonPrefix(strs) << "\"" << endl;
 
     return 0;
 }
