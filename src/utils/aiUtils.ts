@@ -93,6 +93,7 @@ QUALITY REQUIREMENTS:
 - Handle empty arrays, negative numbers, large numbers
 - Memory management (delete objects if needed)
 - Add "Hare Krishna! Chant and be happy" comment at the top of the code
+- Declare Every varible that is generated.
 
 COMMON PITFALLS TO AVOID:
 - **Don't place class declarations after functions that use them**
@@ -193,6 +194,11 @@ export const callGeminiAPI = async (
   apiKey: string
 ): Promise<string> => {
   try {
+
+    console.log('API Key length:', apiKey.length)
+    console.log('API Key prefix:', apiKey.substring(0, 10))
+    console.log('API Key format check:', validateApiKey(apiKey))
+
     debugLog('Calling Gemini API', { promptLength: prompt.length })
 
     // Validate API key first
