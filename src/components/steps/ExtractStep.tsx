@@ -37,11 +37,10 @@ export const ExtractStep: React.FC<ExtractStepProps> = ({
   const [copyState, setCopyState] = useState('copy')
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-3'>
       <div className='text-center'>
-        <div className='text-3xl mb-3'>🔍</div>
         <h1 className='text-lg font-bold text-gray-900 mb-2'>
-          Extract Function
+          🔍 Extract Function
         </h1>
         <p className='text-sm text-gray-600'>
           Paste your VS Code solution to extract submittable code

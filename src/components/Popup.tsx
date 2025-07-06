@@ -86,6 +86,15 @@ export default function Popup() {
     }
   }
 
+  // Updated handleSupportClick function
+  const handleSupportClick = (type: 'support') => {
+    const urls = {
+      support: 'https://coff.ee/tanishq_aswar',
+    }
+
+    chrome.tabs.create({ url: urls[type] })
+  }
+
   // Extract function
   const handleExtract = async () => {
     if (!extractCode.trim()) {
@@ -145,7 +154,6 @@ export default function Popup() {
             onNext={() => setStep('boilerplate')}
           />
         )}
-
         {step === 'boilerplate' && (
           <BoilerplateStep
             language={language}
@@ -156,7 +164,6 @@ export default function Popup() {
             onComplete={completeSetup}
           />
         )}
-
         {step === 'generate' && (
           <GenerateStep
             language={language}
@@ -170,7 +177,6 @@ export default function Popup() {
             onExtract={() => setStep('extract')}
           />
         )}
-
         {step === 'extract' && (
           <ExtractStep
             language={language}
@@ -185,7 +191,6 @@ export default function Popup() {
             onGenerate={() => setStep('generate')}
           />
         )}
-
         {step === 'settings' && (
           <SettingsStep
             apiKey={apiKey}
@@ -199,6 +204,26 @@ export default function Popup() {
             onReset={handleReset}
           />
         )}
+
+        {/* Support Section - Always visible at bottom */}
+        {/* Support Section - Always visible at bottom */}
+        <div className='border-t border-gray-200 pt-4 mt-4'>
+          <div className='text-center'>
+            <div className='group relative inline-block mb-3'>
+              <button
+                onClick={() => handleSupportClick('support')}
+                className='px-4 py-2 bg-orange-500 text-white text-sm rounded-md hover:bg-orange-600 transition-colors flex items-center gap-2 cursor-help'
+              >
+                💝 Kindly Support
+              </button>
+              <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-64 text-center z-10'>
+                As I am an individual developer and maintainer, your support is
+                essential to keep the project ongoing.
+                <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800'></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

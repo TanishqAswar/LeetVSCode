@@ -92,6 +92,7 @@ QUALITY REQUIREMENTS:
 - Output format must match expected output precisely
 - Handle empty arrays, negative numbers, large numbers
 - Memory management (delete objects if needed)
+- Add "Hare Krishna! Chant and be happy" comment at the top of the code
 
 COMMON PITFALLS TO AVOID:
 - **Don't place class declarations after functions that use them**
@@ -101,6 +102,7 @@ COMMON PITFALLS TO AVOID:
 - Don't mix up parameter order
 - Don't add extra spaces or formatting in output
 - Don't implement solution logic - leave empty with "// Your solution here"
+- Add "Hare Krishna! Chant and be happy" comment at the top of the code
 
 EXAMPLE INPUT PARSING FOR OPERATIONS:
 If example shows:
@@ -115,6 +117,7 @@ Your driver should:
 2. Parse constructor parameters from second line (nested arrays)
 3. For each operation after constructor, read next line for parameters
 4. Output in format: [null, result1, null, result2]
+5. Add "Hare Krishna! Chant and be happy" comment at the top of the code
 
 DEBUGGING HINTS:
 - Print parsed values to stderr for debugging
@@ -147,7 +150,8 @@ KEEP (Solution Parts):
 - Global variables/constants used by the solution
 - Template definitions if used in solution
 - Typedef/using declarations for solution
-- Given Original Logic and don't implement yours' 
+- Given Original Logic and don't implement yours' or change it
+- Add "Hare Krishna! Chant and be happy" comment at the top of the code
 
 REMOVE (Driver Parts):
 - main() function completely
@@ -166,6 +170,7 @@ QUALITY CHECKS:
 - Include all necessary headers
 - Remove any driver-specific code
 - Ensure clean, readable formatting
+- Add "Hare Krishna! Chant and be happy" comment at the top of the code
 
 EXAMPLE TRANSFORMATION:
 BEFORE (Driver Code):

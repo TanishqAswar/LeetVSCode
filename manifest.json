@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetVSCode",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Generate driver code and extract solutions for competitive programming platforms",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [

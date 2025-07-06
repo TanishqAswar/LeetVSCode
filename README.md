@@ -1,8 +1,8 @@
 // README.md
 
-# LeetVSCode Chrome Extension
+# LeetVSCode Browser Extension
 
-A powerful Chrome extension that helps competitive programmers generate driver code and extract solutions for various coding platforms.
+A powerful Browser extension that helps competitive programmers generate driver code and extract solutions for various coding platforms.
 
 ## Features
 
@@ -18,7 +18,7 @@ A powerful Chrome extension that helps competitive programmers generate driver c
 1. Clone this repository
 2. Run `npm install`
 3. Run `npm run build`
-4. Load the `dist` folder as an unpacked extension in Chrome
+4. Load the `dist` folder as an unpacked extension in Browser
 
 ## Usage
 
