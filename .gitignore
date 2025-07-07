@@ -24,6 +24,9 @@ build/
 *.swo
 *~
 
+# testcpp files
+testcpp/
+
 # OS generated files
 .DS_Store
 .DS_Store?

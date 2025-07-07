@@ -73,6 +73,8 @@ vector<int> parseArray(const string& str) {
     return result;
 }
 
+Figure it out if needed.
+
 **For Single Function Problems:**
 Read input according to constraints, call function once, output result.
 
@@ -92,14 +94,16 @@ QUALITY REQUIREMENTS:
 - Output format must match expected output precisely
 - Handle empty arrays, negative numbers, large numbers
 - Memory management (delete objects if needed)
-- Add "Hare Krishna! Chant and be happy" comment at the top of the code
+- Add "// Hare Krishna! Chant and be happy" comment at the top of the code
 - Declare Every varible that is generated.
+- Distinguish the function return with what output should be printed and in which format
 
 COMMON PITFALLS TO AVOID:
 - **Don't place class declarations after functions that use them**
 - Don't overcomplicate parsing - use simple string operations
 - Don't assume input format - extract it from examples
 - Don't forget to handle the constructor as first operation
+- Don't directly output the function return but analyse what is to be printed and how it is to be printed
 - Don't mix up parameter order
 - Don't add extra spaces or formatting in output
 - Don't implement solution logic - leave empty with "// Your solution here"
@@ -171,7 +175,7 @@ QUALITY CHECKS:
 - Include all necessary headers
 - Remove any driver-specific code
 - Ensure clean, readable formatting
-- Add "Hare Krishna! Chant and be happy" comment at the top of the code
+- Add "// Hare Krishna! Chant and be happy" comment at the top of the code
 
 EXAMPLE TRANSFORMATION:
 BEFORE (Driver Code):
