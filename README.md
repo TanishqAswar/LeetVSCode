@@ -53,6 +53,7 @@ git clone https://github.com/TanishqAswar/LeetVSCode.git
 2. Click **"Code"** → **"Download ZIP"**
 3. Extract the ZIP file to your desired location
 
+### Setting Up the Extension
 ```bash
 # Navigate to the project directory
 cd LeetVSCode
