@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API key validation issues
 - Browser compatibility problems
 
-## [1.0.0] - 2025-07-06
+## [1.0.0] - 2025-06-06
 
 ### Added
 - Initial release of LeetVSCode
@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Robust error handling and user feedback
 - Cross-browser compatibility layer
 
-## [0.9.0] - 2025-06-20 (Beta)
+## [0.9.0] - 2025-06-05 (Beta)
 
 ### Added
 - Beta release for testing
@@ -83,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API timeout issues
 - UI responsiveness problems
 
-## [0.8.0] - 2025-06-01 (Alpha)
+## [0.8.0] - 2025-06-05 (Alpha)
 
 ### Added
 - Alpha release for early testing
@@ -98,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI/UX needs improvement
 - Performance optimization required
 
-## [0.7.0] - 2025-05-15 (Pre-Alpha)
+## [0.7.0] - 2025-06-04 (Pre-Alpha)
 
 ### Added
 - Project initialization
@@ -284,4 +284,5 @@ Special thanks to all contributors who made this release possible:
 
 ---
 
-*For the complete version history and detailed technical changes, see the [commit history](https://github.com/TanishqAswar/LeetVSCode/commits/main) on GitHub.*
+*For the complete version history and detailed technical changes, see the [commit history](https://github.com/TanishqAswar/LeetVSCode/commits/main) on GitHub.* <br>
+*Hare Krishna - Chant And Be Happy*

@@ -45,12 +45,6 @@ A powerful browser extension for competitive programming and DSA practice that s
 ```bash
 # Clone the repository
 git clone https://github.com/TanishqAswar/LeetVSCode.git
-
-# Navigate to the project directory
-cd LeetVSCode
-
-# Optional: Install dependencies if any
-npm install
 ```
 
 ### Method 2: Download ZIP
@@ -58,6 +52,17 @@ npm install
 1. Go to [GitHub Repository](https://github.com/TanishqAswar/LeetVSCode)
 2. Click **"Code"** → **"Download ZIP"**
 3. Extract the ZIP file to your desired location
+
+```bash
+# Navigate to the project directory
+cd LeetVSCode
+
+# Install dependencies
+npm install
+
+# Build the project once to have a dist repo in the root
+npm run build
+```
 
 ### Loading the Extension
 
@@ -68,7 +73,7 @@ npm install
    - **Brave**: `brave://extensions/`
 3. Enable **Developer mode** (toggle switch in the top right)
 4. Click **"Load unpacked"** button
-5. Select the `LeetVSCode` folder (or extracted folder)
+5. Select the `LeetVSCode/dist` folder (or extracted folder)
 6. Confirm the extension is installed and enabled
 
 ### Get Your API Key

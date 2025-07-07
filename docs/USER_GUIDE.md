@@ -310,7 +310,7 @@ A: Currently, LeetVSCode is designed for desktop browsers only.
 A: All data is stored locally in your browser. Only your code is sent to Google's Gemini API for processing.
 
 **Q: Can I contribute to the project?**
-A: Yes! Check our [Contributing Guide](../CONTRIBUTING.md) for details.
+A: Yes! Check our [Contributing Guide](./CONTRIBUTING.md) for details.
 
 **Q: How do I report a bug?**
 A: Create an issue on our [GitHub repository](https://github.com/TanishqAswar/LeetVSCode/issues).

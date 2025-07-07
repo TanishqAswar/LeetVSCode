@@ -87,10 +87,11 @@ export default function Popup() {
   }
 
   // Updated handleSupportClick function
-  const handleSupportClick = (type: 'support' | 'gita') => {
+  const handleSupportClick = (type: 'support' | 'gita' | 'discuss') => {
     const urls = {
       support: 'https://coff.ee/tanishq_aswar',
       gita: 'https://gitadaily.com/',
+      discuss: 'https://github.com/TanishqAswar/LeetVSCode/discussions',
     }
 
     chrome.tabs.create({ url: urls[type] })
@@ -207,38 +208,56 @@ export default function Popup() {
         )}
 
         {/* Support Section - Always visible at bottom */}
-        {/* Support Section - Always visible at bottom */}
         <div className='border-t border-gray-200 pt-4 mt-4'>
           <div className='text-center'>
-            <div className='flex justify-center items-center gap-3'>
-              {/* Kindly Support Button */}
-              <div className='group relative'>
-                <button
-                  onClick={() => handleSupportClick('support')}
-                  className='px-4 py-2 bg-orange-500 text-white text-sm rounded-md hover:bg-orange-600 transition-colors flex items-center gap-2'
-                >
-                  💝 Kindly Support
-                </button>
-                <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-48 text-center z-10 leading-relaxed'>
-                  As an individual developer and maintainer, your support keeps this project
-                  going.
-                  <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800'></div>
+            <div className='flex flex-col items-center gap-3'>
+              {/* Top row: Support and Stressed buttons */}
+              <div className='flex justify-center items-center gap-3'>
+                {/* Kindly Support Button */}
+                <div className='group relative'>
+                  <button
+                    onClick={() => handleSupportClick('support')}
+                    className='px-4 py-2 bg-orange-500 text-white text-sm rounded-md hover:bg-orange-600 transition-colors flex items-center gap-2'
+                  >
+                    💝 Kindly Support
+                  </button>
+                  <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-48 text-center z-10 leading-relaxed'>
+                    As an individual developer and maintainer, your support
+                    keeps this project going.
+                    <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800'></div>
+                  </div>
+                </div>
+
+                {/* Stressed Button */}
+                <div className='group relative'>
+                  <button
+                    onClick={() => handleSupportClick('gita')}
+                    className='px-4 py-2 bg-gradient-to-r from-green-400 to-green-500 text-white text-sm rounded-md transition-all duration-300 flex items-center gap-2'
+                  >
+                    😇 Stressed?
+                  </button>
+                  <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
+                    Try Reading Bhagavad Gita
+                    <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-orange-600'></div>
+                  </div>
                 </div>
               </div>
 
-              {/* Stressed Button */}
-              <div className='group relative'>
-                <button
-                  onClick={() => handleSupportClick('gita')}
-                  className='px-4 py-2 bg-gradient-to-r from-green-400 to-green-500 text-white text-sm rounded-md transition-all duration-300 flex items-center gap-2'
-                >
-                  😇 Stressed?
-                </button>
-                <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
-                  Try Reading Bhagavad Gita
-                  <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-tran  sparent border-t-orange-600'></div>
+              {/* Bottom row: Discuss button */}
+              {step !== 'intro' && (
+                <div className='group relative'>
+                  <button
+                    onClick={() => handleSupportClick('discuss')}
+                    className='px-4 py-2 bg-gradient-to-r from-purple-400 to-blue-500 text-white text-sm rounded-md transition-all duration-300 flex items-center gap-2'
+                  >
+                    💭 Discuss
+                  </button>
+                  <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gradient-to-r from-gray-600 to-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
+                    Report a bug, Demand a Feature, Or just Discuss
+                    <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-600'></div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
