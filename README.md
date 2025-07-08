@@ -40,6 +40,9 @@ A powerful browser extension for competitive programming and DSA practice that s
 
 ## 📦 Installation
 
+[![Watch the Setup Guide on YouTube](https://img.youtube.com/vi/q9JikhSNDRM/0.jpg)](https://youtu.be/q9JikhSNDRM)
+
+
 ### Method 1: Clone from GitHub (Recommended)
 
 ```bash
