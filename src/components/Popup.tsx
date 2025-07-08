@@ -86,15 +86,25 @@ export default function Popup() {
     }
   }
 
-  // Updated handleSupportClick function
   const handleSupportClick = (type: 'support' | 'gita' | 'discuss') => {
     const urls = {
       support: 'https://coff.ee/tanishq_aswar',
-      gita: 'https://gitadaily.com/',
       discuss: 'https://github.com/TanishqAswar/LeetVSCode/discussions',
+      gita: getRandomGitaContent(),
     }
 
     chrome.tabs.create({ url: urls[type] })
+  }
+
+  function getRandomGitaContent(): string {
+    const gitaLinks = [
+      'https://gitadaily.com/', // Chaitanya Charan Prabhu’s blog
+      'https://www.youtube.com/watch?v=cBmpasCxlNI', // Janvi Mataji Bhajans
+      'https://youtu.be/ODJ3evaA5iA?si=EV2HRSfneCYb4dG6', // Gauranga Prabhu lectures
+    ]
+
+    const randomIndex = Math.floor(Math.random() * gitaLinks.length)
+    return gitaLinks[randomIndex]
   }
 
   // Extract function

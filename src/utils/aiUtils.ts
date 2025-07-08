@@ -211,7 +211,7 @@ export const callGeminiAPI = async (
     }
 
     // Try gemini-1.5-flash first, fallback to gemini-pro
-    const models = ['gemini-1.5-flash', 'gemini-pro']
+    const models = ['gemini-1.5-flash']
     let lastError: Error | null = null
 
     for (const model of models) {

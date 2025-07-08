@@ -63,11 +63,11 @@ export const GenerateStep: React.FC<GenerateStepProps> = ({
                     {problemInfo.difficulty}
                   </Badge>
                 )}
-                {problemInfo.tags.map((tag) => (
+                {/* {problemInfo.tags.map((tag) => (
                   <Badge key={tag} variant='default'>
                     {tag}
                   </Badge>
-                ))}
+                ))} */}
               </div>
             </div>
           </Card>
