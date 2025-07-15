@@ -37,6 +37,7 @@ CRITICAL ANALYSIS STEPS:
    - Note if arrays are represented as [1,2,3] or separated by spaces
    - Check if strings are quoted or not
    - Identify nested structures like [[1,2],[3,4]]
+   - Note at the ',' comma should be properly taken and handled in the input
 
 3. **Output Format Analysis**:
    - Check if output should be [null, result1, null, result2] format
