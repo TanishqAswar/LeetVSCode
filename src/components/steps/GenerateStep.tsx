@@ -1,4 +1,4 @@
-// src/components/steps/GenerateStep.tsx
+// src/components/steps/GenerateStep.tsx (UPDATED)
 import React, { useState } from 'react'
 import {
   Button,
@@ -21,6 +21,7 @@ interface GenerateStepProps {
   onGenerate: () => void
   onSettings: () => void
   onExtract: () => void
+  onSuggestions: () => void // Added this missing prop
 }
 
 export const GenerateStep: React.FC<GenerateStepProps> = ({
@@ -33,6 +34,7 @@ export const GenerateStep: React.FC<GenerateStepProps> = ({
   onGenerate,
   onSettings,
   onExtract,
+  onSuggestions, // Added this missing prop
 }) => {
   const [copyState, setCopyState] = useState('copy')
 
@@ -63,11 +65,6 @@ export const GenerateStep: React.FC<GenerateStepProps> = ({
                     {problemInfo.difficulty}
                   </Badge>
                 )}
-                {/* {problemInfo.tags.map((tag) => (
-                  <Badge key={tag} variant='default'>
-                    {tag}
-                  </Badge>
-                ))} */}
               </div>
             </div>
           </Card>
@@ -131,12 +128,12 @@ export const GenerateStep: React.FC<GenerateStepProps> = ({
           </div>
           <Textarea value={driverCode} readOnly rows={12} />
         </Card>
-      
       )}
 
+      {/* Navigation Buttons - matching the ExtractStep design */}
       <div className='text-center pt-4 border-t border-gray-200'>
-        <Button onClick={onExtract} variant='ghost' size='sm'>
-          Need to extract function? →
+        <Button onClick={onExtract} variant='ghost' size='md'>
+          🔍 Extract Function
         </Button>
       </div>
     </div>

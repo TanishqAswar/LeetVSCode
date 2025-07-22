@@ -1,4 +1,4 @@
-// src/components/Popup.tsx (MAIN COMPONENT)
+// src/components/Popup.tsx (FIXED - Added default export)
 import React, { useEffect, useState } from 'react'
 import { Language, ProblemInfo, StepType } from '../types'
 import {
@@ -10,6 +10,8 @@ import {
   generateDriverPrompt,
   generateExtractPrompt,
   callGeminiAPI,
+  getAISuggestion,
+  buildConversationHistory,
 } from '../utils/aiUtils'
 import { testApiConnection } from '../utils/aiUtils'
 
@@ -19,8 +21,9 @@ import { BoilerplateStep } from './steps/BoilerplateStep'
 import { GenerateStep } from './steps/GenerateStep'
 import { ExtractStep } from './steps/ExtractStep'
 import { SettingsStep } from './steps/SettingsStep'
+import { AISuggestionStep } from './steps/AISuggestionStep'
 
-export default function Popup() {
+function Popup() {
   const [step, setStep] = useState<StepType>('intro')
   const [isLoading, setIsLoading] = useState(false)
   const [language, setLanguage] = useState<Language>('C++')
@@ -42,6 +45,12 @@ export default function Popup() {
   const [driverCode, setDriverCode] = useState('')
   const [extractCode, setExtractCode] = useState('')
   const [extractedFunction, setExtractedFunction] = useState('')
+
+  // State for AI suggestions
+  const [currentProblemHtml, setCurrentProblemHtml] = useState('')
+  const [suggestionMessages, setSuggestionMessages] = useState<
+    Array<{ type: 'user' | 'ai'; content: string }>
+  >([])
 
   const currentTab = useCurrentTab()
   const isPlatformPage = currentTab
@@ -67,6 +76,7 @@ export default function Popup() {
       })
 
       const html = result.result
+      setCurrentProblemHtml(html) // Store for AI suggestions
       console.log(html)
 
       const currentUrl = currentTab.url || ''
@@ -86,6 +96,45 @@ export default function Popup() {
     }
   }
 
+  // Handle AI suggestions
+  const handleGetSuggestion = async (userQuery?: string): Promise<string> => {
+    let htmlContent = currentProblemHtml
+
+    // If we don't have HTML content, fetch it
+    if (!htmlContent && currentTab?.id) {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: currentTab.id },
+        func: () => document.documentElement.outerHTML,
+      })
+      htmlContent = result.result
+      setCurrentProblemHtml(htmlContent)
+
+      // Also extract problem info if we don't have it
+      if (!problemInfo.title) {
+        const currentUrl = currentTab.url || ''
+        const info = extractProblemInfo(currentUrl, htmlContent)
+        setProblemInfo(info)
+      }
+    }
+
+    // Build conversation history for context
+    const conversationHistory =
+      suggestionMessages.length > 0
+        ? buildConversationHistory(suggestionMessages)
+        : undefined
+
+    const response = await getAISuggestion(
+      apiKey,
+      htmlContent,
+      language,
+      problemInfo,
+      userQuery,
+      conversationHistory
+    )
+
+    return response
+  }
+
   const handleSupportClick = (type: 'support' | 'gita' | 'discuss') => {
     const urls = {
       support: 'https://coff.ee/tanishq_aswar',
@@ -98,7 +147,7 @@ export default function Popup() {
 
   function getRandomGitaContent(): string {
     const gitaLinks = [
-      'https://gitadaily.com/', // Chaitanya Charan Prabhu’s blog
+      'https://gitadaily.com/', // Chaitanya Charan Prabhu's blog
       'https://www.youtube.com/watch?v=cBmpasCxlNI', // Janvi Mataji Bhajans
       'https://youtu.be/ODJ3evaA5iA?si=EV2HRSfneCYb4dG6', // Gauranga Prabhu lectures
     ]
@@ -152,6 +201,7 @@ export default function Popup() {
       setCustomBoilerplate('')
       setHasSeenIntro(false)
       setStep('intro')
+      setSuggestionMessages([]) // Clear suggestion history
       alert('✅ All data reset!')
     }
   }
@@ -187,6 +237,7 @@ export default function Popup() {
             onGenerate={handleGenerate}
             onSettings={() => setStep('settings')}
             onExtract={() => setStep('extract')}
+            onSuggestions={() => setStep('suggestions')}
           />
         )}
         {step === 'extract' && (
@@ -201,6 +252,17 @@ export default function Popup() {
             onExtract={handleExtract}
             onSettings={() => setStep('settings')}
             onGenerate={() => setStep('generate')}
+            onSuggestions={() => setStep('suggestions')}
+          />
+        )}
+        {step === 'suggestions' && (
+          <AISuggestionStep
+            language={language}
+            problemInfo={problemInfo}
+            apiKey={apiKey}
+            isLoading={isLoading}
+            onBack={() => setStep(isPlatformPage ? 'generate' : 'extract')}
+            onGetSuggestion={handleGetSuggestion}
           />
         )}
         {step === 'settings' && (
@@ -220,18 +282,18 @@ export default function Popup() {
         {/* Support Section - Always visible at bottom */}
         <div className='border-t border-gray-200 pt-4 mt-4'>
           <div className='text-center'>
-            <div className='flex flex-col items-center gap-3'>
-              {/* Top row: Support and Stressed buttons */}
-              <div className='flex justify-center items-center gap-3'>
+            <div className='flex flex-col items-center gap-2'>
+              {/* Top row: Support, Stressed, and Discuss buttons */}
+              <div className='flex justify-center items-center gap-2 flex-wrap'>
                 {/* Kindly Support Button */}
                 <div className='group relative'>
                   <button
                     onClick={() => handleSupportClick('support')}
-                    className='px-4 py-2 bg-orange-500 text-white text-sm rounded-md hover:bg-orange-600 transition-colors flex items-center gap-2'
+                    className='px-2 py-2 h-9 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 transition-colors flex items-center gap-1'
                   >
                     💝 Kindly Support
                   </button>
-                  <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-48 text-center z-10 leading-relaxed'>
+                  <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
                     As an individual developer and maintainer, your support
                     keeps this project going.
                     <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800'></div>
@@ -242,31 +304,61 @@ export default function Popup() {
                 <div className='group relative'>
                   <button
                     onClick={() => handleSupportClick('gita')}
-                    className='px-4 py-2 bg-gradient-to-r from-green-400 to-green-500 text-white text-sm rounded-md transition-all duration-300 flex items-center gap-2'
+                    className='px-3 py-2 h-9 bg-gradient-to-r from-green-400 to-green-500 text-white text-xs rounded-md transition-all duration-300 flex items-center gap-1'
                   >
                     😇 Stressed?
                   </button>
                   <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
-                    Try Reading Bhagavad Gita, Listening Beautiful Bhajans, or just watch a small video
+                    Try Reading Bhagavad Gita, Listening Beautiful Bhajans, or
+                    just watch a small video
                     <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-orange-600'></div>
                   </div>
                 </div>
+
+                {/* Discuss Button */}
+                {step !== 'intro' && (
+                  <div className='group relative'>
+                    <button
+                      onClick={() => handleSupportClick('discuss')}
+                      className='px-3 py-2 h-9 bg-gradient-to-r from-purple-400 to-blue-500 text-white text-xs rounded-md transition-all duration-300 flex items-center gap-2'
+                    >
+                      💭 Discuss
+                    </button>
+                    <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gradient-to-r from-gray-600 to-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
+                      Report a bug, Demand a Feature, Or just Discuss
+                      <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-600'></div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Bottom row: Discuss button */}
-              {step !== 'intro' && (
-                <div className='group relative'>
-                  <button
-                    onClick={() => handleSupportClick('discuss')}
-                    className='px-4 py-2 bg-gradient-to-r from-purple-400 to-blue-500 text-white text-sm rounded-md transition-all duration-300 flex items-center gap-2'
-                  >
-                    💭 Discuss
-                  </button>
-                  <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gradient-to-r from-gray-600 to-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
-                    Report a bug, Demand a Feature, Or just Discuss
-                    <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-600'></div>
-                  </div>
-                </div>
+              {/* Bottom row: AI Suggestion button only */}
+              {step !== 'intro' &&
+                step !== 'boilerplate' &&
+                step !== 'settings' &&
+                step !==
+                  'suggestions' &&(
+                    <div className='flex justify-center items-center w-full'>
+                      {/* AI Suggestion Button */}
+                      <div className='group relative max-w-xs'>
+                        <button
+                          onClick={() => setStep('suggestions')}
+                          disabled={!apiKey}
+                          className='px-6 py-2 h-9 bg-gray-600 text-white text-xs rounded-md transition-all duration-300 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800'
+                        >
+                          🧘‍♂️ Get AI Guidance
+                        </button>
+                        <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
+                          Get AI hints and ask for follow-ups
+                          <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black'></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+              {!apiKey && (
+                <p className='text-red-500 text-xs text-center'>
+                  Please set your Gemini API key in settings to use AI features
+                </p>
               )}
             </div>
           </div>
@@ -275,3 +367,6 @@ export default function Popup() {
     </div>
   )
 }
+
+// Add default export
+export default Popup

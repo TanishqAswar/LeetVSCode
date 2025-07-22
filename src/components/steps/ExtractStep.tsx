@@ -1,6 +1,5 @@
-// src/components/steps/ExtractStep.tsx (COMPLETED)
-import React from 'react'
-import { useState } from 'react'
+// src/components/steps/ExtractStep.tsx
+import React, { useState } from 'react'
 import { Button, Select, Card, Textarea, LoadingSpinner } from '../UIComponents'
 import { Language, LANGUAGES } from '../../types'
 import { copyToClipboard } from '../../utils/commonUtils'
@@ -16,6 +15,7 @@ interface ExtractStepProps {
   onExtract: () => void
   onSettings: () => void
   onGenerate: () => void
+  onSuggestions: () => void // Added this missing prop from original
 }
 
 export const ExtractStep: React.FC<ExtractStepProps> = ({
@@ -29,11 +29,8 @@ export const ExtractStep: React.FC<ExtractStepProps> = ({
   onExtract,
   onSettings,
   onGenerate,
-  
-}
-
-) => {
-
+  onSuggestions, // Added this missing prop
+}) => {
   const [copyState, setCopyState] = useState('copy')
 
   return (
@@ -120,11 +117,18 @@ export const ExtractStep: React.FC<ExtractStepProps> = ({
         </Card>
       )}
 
+      {/* Navigation Buttons - matching the original design */}
       <div className='text-center pt-4 border-t border-gray-200'>
         <Button onClick={onGenerate} variant='ghost' size='sm'>
           ← Back to Generate
         </Button>
       </div>
+
+      {!apiKey && (
+        <p className='text-red-500 text-xs text-center'>
+          Please set your Gemini API key in settings to use AI features
+        </p>
+      )}
     </div>
   )
 }

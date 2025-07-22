@@ -36,9 +36,21 @@ export const SettingsStep: React.FC<SettingsStepProps> = ({
 
   return (
     <div className='space-y-6'>
+      {/* Header with Back Button */}
+      <div className='flex items-center justify-between' style={{marginBottom:'-20px'}}>
+        <Button
+          onClick={onBack}
+          variant='ghost'
+          size='sm'
+          className='flex items-center gap-1'
+        >
+          ← Back
+        </Button>
+        <div className='flex-1'></div>
+      </div>
+
       <div className='text-center'>
-        <div className='text-3xl mb-3'>⚙️</div>
-        <h1 className='text-lg font-bold text-gray-900 mb-2'>Settings</h1>
+        <h1 className='text-lg font-bold text-gray-900 mb-2'>⚙️ Settings</h1>
         <p className='text-sm text-gray-600'>Update your preferences</p>
       </div>
 
@@ -107,12 +119,6 @@ export const SettingsStep: React.FC<SettingsStepProps> = ({
 
         <Button onClick={onReset} variant='danger' className='w-full'>
           🗑️ Reset All Data
-        </Button>
-      </div>
-
-      <div className='text-center pt-4 border-t border-gray-200'>
-        <Button onClick={onBack} variant='ghost' size='sm'>
-          ← Back
         </Button>
       </div>
     </div>

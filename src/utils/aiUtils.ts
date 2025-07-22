@@ -1,11 +1,54 @@
 // src/utils/aiUtils.ts
-import { Language } from '../types'
+import { Language, ProblemInfo } from '../types'
 import {
   debugLog,
   testGeminiInExtension,
   getDebugLogs,
   clearDebugLogs,
 } from './debugUtils'
+
+// Enhanced rate limiting configuration
+interface RateLimitConfig {
+  maxRetries: number
+  baseDelay: number
+  maxDelay: number
+  backoffMultiplier: number
+}
+
+const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = {
+  maxRetries: 5,
+  baseDelay: 2000, // Start with 2 seconds
+  maxDelay: 60000, // Max 60 seconds
+  backoffMultiplier: 2,
+}
+
+// Track API calls per minute
+class APIRateLimiter {
+  private callTimes: number[] = []
+  private readonly maxCallsPerMinute = 15 // Conservative limit
+  private readonly timeWindow = 60000 // 1 minute
+
+  canMakeCall(): boolean {
+    const now = Date.now()
+    // Remove calls older than 1 minute
+    this.callTimes = this.callTimes.filter(
+      (time) => now - time < this.timeWindow
+    )
+    return this.callTimes.length < this.maxCallsPerMinute
+  }
+
+  recordCall(): void {
+    this.callTimes.push(Date.now())
+  }
+
+  getNextAvailableTime(): number {
+    if (this.callTimes.length === 0) return 0
+    const oldestCall = Math.min(...this.callTimes)
+    return Math.max(0, this.timeWindow - (Date.now() - oldestCall))
+  }
+}
+
+const rateLimiter = new APIRateLimiter()
 
 export const generateDriverPrompt = (
   html: string,
@@ -194,171 +237,257 @@ class Solution { /* solution implementation */ };
 OUTPUT: Return clean, submittable code without markdown formatting with no backticks. The code should be ready to paste directly into online judges.`
 }
 
+// Enhanced delay function with exponential backoff
+async function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Calculate delay with exponential backoff and jitter
+function calculateDelay(attempt: number, config: RateLimitConfig): number {
+  const exponentialDelay = Math.min(
+    config.baseDelay * Math.pow(config.backoffMultiplier, attempt),
+    config.maxDelay
+  )
+
+  // Add jitter (±20% randomness)
+  const jitter = exponentialDelay * 0.2 * (Math.random() - 0.5)
+  return Math.floor(exponentialDelay + jitter)
+}
+
 export const callGeminiAPI = async (
   prompt: string,
-  apiKey: string
+  apiKey: string,
+  preserveMarkdown: boolean = false,
+  config: RateLimitConfig = DEFAULT_RATE_LIMIT_CONFIG
 ): Promise<string> => {
-  try {
+  // Check rate limiter first
+  if (!rateLimiter.canMakeCall()) {
+    const waitTime = rateLimiter.getNextAvailableTime()
+    debugLog('Rate limiter: waiting', { waitTime })
+    await delay(waitTime + 1000) // Add 1 second buffer
+  }
 
-    console.log('API Key length:', apiKey.length)
-    console.log('API Key prefix:', apiKey.substring(0, 10))
-    console.log('API Key format check:', validateApiKey(apiKey))
+  let lastError: Error | null = null
 
-    debugLog('Calling Gemini API', { promptLength: prompt.length })
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      debugLog(`API attempt ${attempt + 1}`, {
+        promptLength: prompt.length,
+        apiKeyValid: validateApiKey(apiKey),
+      })
 
-    // Validate API key first
-    if (!validateApiKey(apiKey)) {
-      throw new Error('Invalid API key format')
-    }
+      // Validate API key
+      if (!validateApiKey(apiKey)) {
+        throw new Error('Invalid API key format')
+      }
 
-    // Try gemini-1.5-flash first, fallback to gemini-pro
-    const models = ['gemini-1.5-flash']
-    let lastError: Error | null = null
+      const models = ['gemini-1.5-flash']
 
-    for (const model of models) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.3,
-                topP: 0.9,
-                topK: 40,
-                maxOutputTokens: 2048,
+      for (const model of models) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
               },
-              safetySettings: [
-                {
-                  category: 'HARM_CATEGORY_HARASSMENT',
-                  threshold: 'BLOCK_NONE',
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.3,
+                  topP: 0.9,
+                  topK: 40,
+                  maxOutputTokens: 2048,
                 },
-                {
-                  category: 'HARM_CATEGORY_HATE_SPEECH',
-                  threshold: 'BLOCK_NONE',
-                },
-                {
-                  category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                  threshold: 'BLOCK_NONE',
-                },
-                {
-                  category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                  threshold: 'BLOCK_NONE',
-                },
-              ],
-            }),
-          }
-        )
+                safetySettings: [
+                  {
+                    category: 'HARM_CATEGORY_HARASSMENT',
+                    threshold: 'BLOCK_NONE',
+                  },
+                  {
+                    category: 'HARM_CATEGORY_HATE_SPEECH',
+                    threshold: 'BLOCK_NONE',
+                  },
+                  {
+                    category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                    threshold: 'BLOCK_NONE',
+                  },
+                  {
+                    category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                    threshold: 'BLOCK_NONE',
+                  },
+                ],
+              }),
+            }
+          )
 
-        debugLog(`API Response Status for ${model}`, {
-          status: response.status,
-          ok: response.ok,
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error')
-          debugLog(`API Error Response for ${model}`, {
+          debugLog(`API Response Status for ${model}`, {
             status: response.status,
-            error: errorText,
+            ok: response.ok,
+            attempt: attempt + 1,
           })
 
-          // Handle specific error cases
-          if (response.status === 400) {
-            throw new Error(`Invalid request: ${errorText}`)
-          } else if (response.status === 401) {
-            throw new Error('Invalid API key')
-          } else if (response.status === 403) {
-            throw new Error('API key lacks required permissions')
-          } else if (response.status === 429) {
-            throw new Error('Rate limit exceeded')
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error')
+
+            // Handle rate limiting specifically
+            if (response.status === 429) {
+              debugLog('Rate limit hit', { attempt: attempt + 1, status: 429 })
+
+              // Extract retry-after if available
+              const retryAfter = response.headers.get('retry-after')
+              const waitTime = retryAfter
+                ? parseInt(retryAfter) * 1000
+                : calculateDelay(attempt, config)
+
+              debugLog('Rate limit: waiting', { waitTime, retryAfter })
+
+              if (attempt < config.maxRetries) {
+                await delay(waitTime)
+                throw new Error(`Rate limited, retrying after ${waitTime}ms`)
+              } else {
+                throw new Error('Rate limit exceeded - maximum retries reached')
+              }
+            }
+
+            // Handle other HTTP errors
+            if (response.status === 400) {
+              throw new Error(`Invalid request: ${errorText}`)
+            } else if (response.status === 401) {
+              throw new Error('Invalid API key')
+            } else if (response.status === 403) {
+              throw new Error('API key lacks required permissions')
+            } else if (response.status === 503) {
+              debugLog('Service unavailable', { attempt: attempt + 1 })
+              if (attempt < config.maxRetries) {
+                await delay(calculateDelay(attempt, config))
+                throw new Error('Service temporarily unavailable, retrying...')
+              } else {
+                throw new Error('Service unavailable - maximum retries reached')
+              }
+            }
+
+            throw new Error(
+              `HTTP error! status: ${response.status} - ${errorText}`
+            )
           }
 
-          throw new Error(
-            `HTTP error! status: ${response.status} - ${errorText}`
-          )
-        }
-
-        const data = await response.json()
-        debugLog(`API Response Data for ${model}`, {
-          hasData: !!data,
-          hasCandidates: !!data?.candidates,
-          candidatesLength: data?.candidates?.length || 0,
-          fullResponse: data,
-        })
-
-        if (!data.candidates || !data.candidates[0]) {
-          debugLog(`No candidates in response for ${model}`, { fullData: data })
-          throw new Error(
-            `No response from Gemini API (${model}) - no candidates returned`
-          )
-        }
-
-        const candidate = data.candidates[0]
-        debugLog(`Candidate data for ${model}`, { candidate })
-
-        // Check if content was blocked
-        if (candidate.finishReason === 'SAFETY') {
-          debugLog(`Content blocked by safety filters for ${model}`, {
-            candidate,
+          const data = await response.json()
+          debugLog(`API Response Data for ${model}`, {
+            hasData: !!data,
+            hasCandidates: !!data?.candidates,
+            candidatesLength: data?.candidates?.length || 0,
           })
-          throw new Error(`Content blocked by safety filters (${model})`)
+
+          if (!data.candidates || !data.candidates[0]) {
+            throw new Error(
+              `No response from Gemini API (${model}) - no candidates returned`
+            )
+          }
+
+          const candidate = data.candidates[0]
+
+          // Check if content was blocked
+          if (candidate.finishReason === 'SAFETY') {
+            throw new Error(`Content blocked by safety filters (${model})`)
+          }
+
+          if (
+            !candidate.content ||
+            !candidate.content.parts ||
+            !candidate.content.parts[0]
+          ) {
+            throw new Error(
+              `Invalid response structure from Gemini API (${model})`
+            )
+          }
+
+          let text = candidate.content.parts[0].text
+
+          if (!text || text.trim().length === 0) {
+            throw new Error(`Empty response from Gemini API (${model})`)
+          }
+
+          // Record successful call
+          rateLimiter.recordCall()
+
+          // Clean up response based on use case
+          if (preserveMarkdown) {
+            text = text.trim()
+            if (text.startsWith('```') && text.endsWith('```')) {
+              const lines = text.split('\n')
+              if (lines.length > 2) {
+                text = lines.slice(1, -1).join('\n').trim()
+              }
+            }
+          } else {
+            text = text
+              .replace(/^```\w*\n?/, '')
+              .replace(/\n?```$/, '')
+              .replace(/^```/, '')
+              .replace(/```$/, '')
+              .trim()
+
+            text = text
+              .replace(/^Here's the.*?:\n/i, '')
+              .replace(/^The complete.*?:\n/i, '')
+              .replace(/\n\n+/g, '\n\n')
+              .trim()
+          }
+
+          debugLog(`API Success with ${model}`, {
+            responseLength: text.length,
+            attempt: attempt + 1,
+          })
+          return text
+        } catch (modelError) {
+          lastError =
+            modelError instanceof Error
+              ? modelError
+              : new Error('Unknown model error')
+          debugLog(`Model ${model} failed`, {
+            error: lastError.message,
+            attempt: attempt + 1,
+          })
+          // Continue to retry logic
+          break
         }
+      }
 
-        if (
-          !candidate.content ||
-          !candidate.content.parts ||
-          !candidate.content.parts[0]
-        ) {
-          debugLog(`Invalid candidate structure for ${model}`, { candidate })
-          throw new Error(
-            `Invalid response structure from Gemini API (${model})`
-          )
-        }
+      // If we get here, the model failed - check if we should retry
+      if (
+        lastError?.message.includes('Rate limited') ||
+        lastError?.message.includes('Service temporarily unavailable')
+      ) {
+        // These are retryable errors, continue to next attempt
+        continue
+      } else {
+        // Non-retryable error, break out of retry loop
+        break
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error')
+      debugLog(`Attempt ${attempt + 1} failed`, { error: lastError.message })
 
-        let text = candidate.content.parts[0].text
-
-        if (!text || text.trim().length === 0) {
-          debugLog(`Empty response text for ${model}`, { candidate })
-          throw new Error(`Empty response from Gemini API (${model})`)
-        }
-
-        // Enhanced cleanup of markdown formatting
-        text = text
-          .replace(/^```\w*\n?/, '')
-          .replace(/\n?```$/, '')
-          .replace(/^```/, '')
-          .replace(/```$/, '')
-          .trim()
-
-        // Additional cleanup for common AI formatting issues
-        text = text
-          .replace(/^Here's the.*?:\n/i, '')
-          .replace(/^The complete.*?:\n/i, '')
-          .replace(/\n\n+/g, '\n\n')
-          .trim()
-
-        debugLog(`API Success with ${model}`, { responseLength: text.length })
-        return text
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error('Unknown error')
-        debugLog(`Failed with ${model}`, { error: lastError.message })
-        // Continue to next model
+      // If this is the last attempt, don't delay
+      if (attempt < config.maxRetries) {
+        const delayTime = calculateDelay(attempt, config)
+        debugLog('Retrying after delay', {
+          delayTime,
+          nextAttempt: attempt + 2,
+        })
+        await delay(delayTime)
       }
     }
-
-    // If all models failed, throw the last error
-    throw lastError || new Error('All models failed')
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error'
-    debugLog('API Error', { error: errorMessage, fullError: error })
-    console.error('Gemini API Error:', error)
-    return `Error: ${errorMessage}`
   }
+
+  // All attempts failed
+  const errorMessage = lastError?.message || 'All API attempts failed'
+  debugLog('All attempts exhausted', { error: errorMessage })
+  throw new Error(
+    `API Error after ${config.maxRetries + 1} attempts: ${errorMessage}`
+  )
 }
 
 // Enhanced utility function to validate generated code
@@ -469,24 +598,12 @@ export const validateApiKey = (apiKey: string): boolean => {
   return !!(apiKey && apiKey.trim().length > 0 && apiKey.startsWith('AIza'))
 }
 
-// Rate limiting helper
-let lastApiCall = 0
-const API_RATE_LIMIT = 1000 // 1 second between calls
-
+// Remove the old rate limiting approach
 export const rateLimitedApiCall = async (
   prompt: string,
   apiKey: string
 ): Promise<string> => {
-  const now = Date.now()
-  const timeSinceLastCall = now - lastApiCall
-
-  if (timeSinceLastCall < API_RATE_LIMIT) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, API_RATE_LIMIT - timeSinceLastCall)
-    )
-  }
-
-  lastApiCall = Date.now()
+  // Just use the enhanced callGeminiAPI with built-in rate limiting
   return callGeminiAPI(prompt, apiKey)
 }
 
@@ -506,4 +623,133 @@ export const testApiConnection = async (apiKey: string): Promise<string> => {
     debugLog('Test failed', { error: errorMessage })
     return `Test failed: ${errorMessage}`
   }
+}
+
+export function generateSuggestionPrompt(
+  problemHtml: string,
+  language: Language,
+  problemInfo: ProblemInfo,
+  userQuery?: string
+): string {
+  const basePrompt = `
+🕉️ DIVINE GUIDANCE SYSTEM 🕉️
+
+You are a coding mentor with the wisdom of Lord Krishna from the Bhagavad Gita. Your role is to guide programmers towards solutions with hints, not direct answers unless user asks for it. Always maintain a spiritual, encouraging tone.
+
+PROBLEM CONTEXT:
+- Title: ${problemInfo.title}
+- Difficulty: ${problemInfo.difficulty}
+- Language: ${language}
+- Tags: ${problemInfo.tags.join(', ')}
+
+HTML CONTENT:
+${problemHtml}
+
+GUIDANCE PRINCIPLES:
+1. 🙏 Always start with "Hare Krishna, dear friend!" or similar spiritual greeting
+2. 💡 Provide HINTS and GUIDANCE, never direct solutions or complete code until user asks for it
+3. 🧘‍♂️ Use spiritual metaphors and Krishna's wisdom when explaining concepts
+4. 🌸 Be encouraging and supportive, like Krishna guiding Arjuna
+5. 📚 Break down complex problems into smaller, manageable steps
+6. 🎯 Ask guiding questions that lead to self-discovery
+7. 🕊️ End with "May Krishna bless your coding journey!" or "Chant and Be Happy"
+
+RESPONSE STYLE:
+- Use emojis appropriately ( 🙏 💎 🌸 📚 💡)
+- Keep responses concise but meaningful
+- Encourage independent thinking
+
+${
+  userQuery
+    ? `USER'S SPECIFIC QUESTION: ${userQuery}`
+    : 'INITIAL GUIDANCE REQUEST: Provide initial hints and direction for this problem.'
+}
+
+Remember: Your goal is to illuminate the path, not walk it for them. Guide them like Krishna guided Arjuna in the Bhagavad Gita.
+`
+
+  return basePrompt
+}
+
+export function generateFollowUpPrompt(
+  previousConversation: string,
+  userQuery: string,
+  language: Language,
+  problemInfo: ProblemInfo
+): string {
+  return `
+🕉️ CONTINUATION OF DIVINE GUIDANCE 🕉️
+
+PREVIOUS CONVERSATION:
+${previousConversation}
+
+CURRENT PROBLEM:
+- Title: ${problemInfo.title}
+- Language: ${language}
+
+USER'S NEW QUESTION: ${userQuery}
+
+Continue the guidance with the same spiritual tone and principles:
+1. 🙏 Acknowledge their question with grace
+2. 💡 Provide helpful hints without giving away the solution until the user asks for it
+3. 🧘‍♂️ Use Krishna's wisdom and spiritual metaphors
+4. 🌸 Be encouraging and supportive
+5. 🕊️ Guide them towards self-discovery
+6. If the user asks for solution, then give him the solution with proper commented mistakes of his and correct version.
+
+Remember: You are their spiritual coding mentor, helping them grow through understanding, not dependency.
+`
+}
+
+// Updated helper functions to specify markdown preservation
+export async function getAISuggestion(
+  apiKey: string,
+  problemHtml: string,
+  language: Language,
+  problemInfo: ProblemInfo,
+  userQuery?: string,
+  conversationHistory?: string
+): Promise<string> {
+  try {
+    let prompt: string
+
+    if (conversationHistory && userQuery) {
+      // This is a follow-up question
+      prompt = generateFollowUpPrompt(
+        conversationHistory,
+        userQuery,
+        language,
+        problemInfo
+      )
+    } else {
+      // This is initial suggestion or first question
+      prompt = generateSuggestionPrompt(
+        problemHtml,
+        language,
+        problemInfo,
+        userQuery
+      )
+    }
+
+    // Preserve markdown for AI suggestions since they likely contain formatted content
+    const response = await callGeminiAPI(prompt, apiKey, true)
+
+    return response
+  } catch (error) {
+    console.error('AI Suggestion error:', error)
+    throw new Error(`Failed to get AI suggestion, ${error}`)
+  }
+}
+
+// Helper to build conversation history for context
+export function buildConversationHistory(
+  messages: Array<{ type: 'user' | 'ai'; content: string }>
+): string {
+  return messages
+    .map((msg) =>
+      msg.type === 'user'
+        ? `DEVOTEE: ${msg.content}`
+        : `AI'S GUIDANCE: ${msg.content}`
+    )
+    .join('\n\n')
 }
