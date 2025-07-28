@@ -55,186 +55,122 @@ export const generateDriverPrompt = (
   language: Language,
   boilerplate: string
 ): string => {
-  return `You are an expert competitive programming assistant. Analyze this HTML page from a coding platform and generate PERFECT driver code.
+  return `You are an expert competitive programming assistant. Generate complete driver code in ${language} that parses input EXACTLY as shown in examples.
 
-"""
-${html}
-"""
+HTML: ${html}
+BOILERPLATE: ${boilerplate}
 
-TASK: Generate complete, working driver code in ${language} that:
-1. Parses input EXACTLY as shown in the problem examples
-2. Handles the specific input/output format correctly
-3. Calls the solution class/functions properly
-4. Produces the exact expected output format
-5. DO NOT IMPLEMENT THE SOLUTION, LEAVE THE SOLUTION FUNCTION EMPTY WITH COMMENT "Implement Here ... "
-6. **DECLARE ALL CLASSES/STRUCTS BEFORE THE MAIN FUNCTION AND HELPER FUNCTIONS**
+REQUIREMENTS:
+1. Declare all classes/structs BEFORE main function
+2. Parse input exactly matching example format  
+3. Leave solution empty with "// Implement solution here"
+4. Add "// Hare Krishna! Chant and be happy" at top
+5. Handle exact output format (including [null, result] for class problems)
 
-CRITICAL ANALYSIS STEPS:
-1. **Problem Type Detection**: 
-   - Is this a class-based problem with operations? (like ["Constructor", "method1", "method2"])
-   - Is this a single function problem? if yes, don't take test case input even if the boilerplate consists it
-   - Are there multiple test cases?
+IMPORTANT: DO NOT IMPLEMENT YOUR SOLUTION
 
-2. **Input Format Analysis**:
-   - Extract the EXACT input format from examples
-   - Note if arrays are represented as [1,2,3] or separated by spaces
-   - Check if strings are quoted or not
-   - Identify nested structures like [[1,2],[3,4]]
-   - Note at the ',' comma should be properly taken and handled in the input
+PROBLEM TYPES:
+- **Class-based**: Operations array like ["Constructor", "method1", "method2"] 
+- **Single function**: One function call, ignore test case input if boilerplate has it
+- **Multiple test cases**: Loop with t test cases
 
-3. **Output Format Analysis**:
-   - Check if output should be [null, result1, null, result2] format
-   - Or just plain results
-   - Note spacing and formatting requirements
+PARSING HELPERS:
+For C++:
+vector<vector<int>> parseNestedArray(const string& s) {
+    vector<vector<int>> result;
+    vector<int> current;
+    string num = "";
+    bool inArray = false;
+    
+    for (char c : s) {
+        if (c == '[') {
+            inArray = true;
+            if (!current.empty()) result.push_back(current), current.clear();
+        }
+        else if (c == ']') {
+            if (!num.empty()) current.push_back(stoi(num)), num = "";
+            if (inArray && !current.empty()) result.push_back(current), current.clear();
+            inArray = false;
+        }
+        else if (c == ',' || c == ' ') {
+            if (!num.empty()) current.push_back(stoi(num)), num = "";
+        }
+        else if (c == '-' || isdigit(c)) {
+            num += c;
+        }
+    }
+    return result;
+}
 
-PARSING STRATEGY FOR DIFFERENT PROBLEM TYPES:
-
-**For Class-Based Problems (Operations Array):**
-Use simple string parsing with these helper functions:
-
-vector<string> parseOperations(const string& str) {
+vector<string> parseOps(const string& s) {
     vector<string> ops;
-    size_t start = 0;
-    while ((start = str.find('"', start)) != string::npos) {
-        size_t end = str.find('"', start + 1);
-        ops.push_back(str.substr(start + 1, end - start - 1));
-        start = end + 1;
+    bool inQuote = false;
+    string current = "";
+    for (char c : s) {
+        if (c == '"') inQuote = !inQuote;
+        else if (inQuote) current += c;
+        else if (!current.empty()) ops.push_back(current), current = "";
     }
     return ops;
 }
 
-vector<int> parseArray(const string& str) {
-    vector<int> result;
-    stringstream ss;
-    for (char c : str) {
-        if (c == '-' || isdigit(c)) ss << c;
-        else if (ss.tellp() > 0) {
-            result.push_back(stoi(ss.str()));
-            ss.str(""); ss.clear();
-        }
-    }
-    if (ss.tellp() > 0) result.push_back(stoi(ss.str()));
-    return result;
-}
+For graphs, trees, linked lists - build appropriate data structures from parsed arrays.
 
-Figure it out if needed.
+INPUT PATTERNS:
+- Arrays: [1,2,3] or 1 2 3
+- Nested: [[1,2],[3,4]]
+- Graphs: [[0,1],[1,2]] (edges) + n (nodes)
+- Trees: [1,2,3,null,null,4,5] (level-order, null=-1)
+- LinkedLists: [1,2,3,4,5]
+- Strings: "hello" or hello
 
-**For Single Function Problems:**
-Read input according to constraints, call function once, output result.
+OUTPUT PATTERNS:
+- Class problems: [null, result1, null, result2]
+- Function problems: direct result
+- Trees/Lists: convert back to array format
 
-**For Multiple Test Cases:**
-int t; cin >> t;
-while (t--) { /* Process each test case */ }
-
-BOILERPLATE INTEGRATION:
-${boilerplate}
-
-QUALITY REQUIREMENTS:
-- **Declare Solution class before any function that uses it**
-- Code must compile without errors
-- Handle all edge cases mentioned in constraints
-- Use efficient I/O (ios_base::sync_with_stdio(false) for C++)
-- Parse input 'exactly' as shown in examples
-- Output format must match expected output precisely
-- Handle empty arrays, negative numbers, large numbers
-- Memory management (delete objects if needed)
-- Add "// Hare Krishna! Chant and be happy" comment at the top of the code
-- Declare Every varible that is generated.
-- Distinguish the function return with what output should be printed and in which format
-
-COMMON PITFALLS TO AVOID:
-- **Don't place class declarations after functions that use them**
-- Don't overcomplicate parsing - use simple string operations
-- Don't assume input format - extract it from examples
-- Don't forget to handle the constructor as first operation
-- Don't directly output the function return but analyse what is to be printed and how it is to be printed
-- Don't mix up parameter order
-- Don't add extra spaces or formatting in output
-- Don't implement solution logic - leave empty with "// Your solution here"
-- Add "Hare Krishna! Chant and be happy" comment at the top of the code
-
-EXAMPLE INPUT PARSING FOR OPERATIONS:
-If example shows:
+EXAMPLE CLASS PARSING:
 Input: ["FindSumPairs", "count", "add", "count"]
        [[1,1,2,2,2,3],[1,4,5,2,5,4]]
        [7]
        [3,2]
        [8]
 
-Your driver should:
-1. Parse operations array from first line
-2. Parse constructor parameters from second line (nested arrays)
-3. For each operation after constructor, read next line for parameters
-4. Output in format: [null, result1, null, result2]
-5. Add "Hare Krishna! Chant and be happy" comment at the top of the code
+Process: Parse operations → Parse constructor params → For each operation read next line → Output [null, result1, null, result2]
 
-DEBUGGING HINTS:
-- Print parsed values to stderr for debugging
-- Test with the exact example input provided
-- Verify array parsing with nested structures
-- Check if your output format matches exactly (including brackets, commas, nulls)
+STRUCTURE:
+// Hare Krishna! Chant and be happy
+#include <bits/stdc++.h>
+using namespace std;
 
-OUTPUT: Return ONLY the complete working code without markdown formatting with no backticks. The code should be ready to compile and run.`
+class Solution {
+    // Implement solution here
+};
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    // Parse input, build data structures, call solution, format output
+    return 0;
+}
+
+OUTPUT: Complete working driver code without markdown formatting or backticks. Also No Implementation of the given function.`
 }
 
 export const generateExtractPrompt = (
   code: string,
   language: Language
 ): string => {
-  return `Extract the submittable solution from this ${language} code.
+  return `Extract submittable solution from ${language} code. Keep original logic unchanged. Do not implement your own logic even if the given logic is wrong.
 
-TASK: Clean up driver code and extract ONLY the solution parts needed for online judge submission. Also, Don't Implement Your Own Solution, just extract the solution from the given code.
+CODE: ${code}
 
-INPUT CODE:
-"""
-${code}
-"""
+KEEP: Solution class, helper functions, headers, constants, original implementation
+REMOVE: main(), parsing functions, I/O code, driver logic
+REMEMBER: DO NOT IMPLEMENT OR CHANGE ANY LOGIC
+Add "// Hare Krishna! Chant and be happy" at top.
 
-EXTRACTION RULES:
-
-KEEP (Solution Parts):
-- Solution class with all methods implemented
-- Helper functions that are part of the solution algorithm
-- Required headers/imports for the solution
-- Global variables/constants used by the solution
-- Template definitions if used in solution
-- Typedef/using declarations for solution
-- Given Original Logic and don't implement yours' or change it
-- Add "Hare Krishna! Chant and be happy" comment at the top of the code
-
-REMOVE (Driver Parts):
-- main() function completely
-- Input/output handling code
-- Parsing functions (parseArray, parseOperations, etc.)
-- Test case loops
-- Debug prints and comments
-- Object instantiation and deletion
-- Result formatting and output statements
-
-QUALITY CHECKS:
-- Do not include or implement your own solution
-- Ensure all solution methods are complete
-- Keep proper class structure
-- Maintain correct method signatures
-- Include all necessary headers
-- Remove any driver-specific code
-- Ensure clean, readable formatting
-- Add "// Hare Krishna! Chant and be happy" comment at the top of the code
-
-EXAMPLE TRANSFORMATION:
-BEFORE (Driver Code):
-#include <bits/stdc++.h>
-using namespace std;
-class Solution { /* solution implementation */ };
-vector<int> parseArray(string s) { ... }  // REMOVE
-int main() { ... }  // REMOVE
-
-AFTER (Clean Solution):
-#include <bits/stdc++.h>
-using namespace std;
-class Solution { /* solution implementation */ };
-
-OUTPUT: Return clean, submittable code without markdown formatting with no backticks. The code should be ready to paste directly into online judges.`
+OUTPUT: Clean solution code (no markdown, no backticks).`
 }
 
 // Enhanced delay function with exponential backoff
@@ -625,6 +561,136 @@ export const testApiConnection = async (apiKey: string): Promise<string> => {
   }
 }
 
+// export function generateSuggestionPrompt(
+//   problemHtml: string,
+//   language: Language,
+//   problemInfo: ProblemInfo,
+//   userQuery?: string
+// ): string {
+//   const basePrompt = `
+// 🕉️ DIVINE GUIDANCE SYSTEM 🕉️
+
+// You are a coding mentor with the wisdom of Lord Krishna from the Bhagavad Gita. Your role is to guide programmers towards solutions with hints, not direct answers unless user asks for it. Always maintain a spiritual, encouraging tone.
+
+// PROBLEM CONTEXT:
+// - Title: ${problemInfo.title}
+// - Difficulty: ${problemInfo.difficulty}
+// - Language: ${language}
+// - Tags: ${problemInfo.tags.join(', ')}
+
+// HTML CONTENT:
+// ${problemHtml}
+
+// GUIDANCE PRINCIPLES:
+// 1. 🙏 Always start with "Hare Krishna, dear friend!" or similar spiritual greeting
+// 2. 💡 Provide HINTS and GUIDANCE, never direct solutions or complete code until user asks for it
+// 3. 🧘‍♂️ Use spiritual metaphors and Krishna's wisdom when explaining concepts
+// 4. 🌸 Be encouraging and supportive, like Krishna guiding Arjuna
+// 5. 📚 Break down complex problems into smaller, manageable steps
+// 6. 🎯 Ask guiding questions that lead to self-discovery
+// 7. 🕊️ End with "May Krishna bless your coding journey!" or "Chant and Be Happy"
+
+// RESPONSE STYLE:
+// - Use emojis appropriately ( 🙏 💎 🌸 📚 💡)
+// - Keep responses concise but meaningful
+// - Encourage independent thinking
+// - Don't Consider yourself as Krishna but just a senior spiritual and coding mentor
+
+// ${
+//   userQuery
+//     ? `USER'S SPECIFIC QUESTION: ${userQuery}`
+//     : 'INITIAL GUIDANCE REQUEST: Provide initial hints and direction for this problem.'
+// }
+
+// Remember: Your goal is to illuminate the path, not walk it for them. Guide them like Krishna guided Arjuna in the Bhagavad Gita.
+// `
+
+//   return basePrompt
+// }
+
+// export function generateFollowUpPrompt(
+//   previousConversation: string,
+//   userQuery: string,
+//   language: Language,
+//   problemInfo: ProblemInfo
+// ): string {
+//   return `
+// 🕉️ CONTINUATION OF DIVINE GUIDANCE 🕉️
+
+// PREVIOUS CONVERSATION:
+// ${previousConversation}
+
+// CURRENT PROBLEM:
+// - Title: ${problemInfo.title}
+// - Language: ${language}
+
+// USER'S NEW QUESTION: ${userQuery}
+
+// Continue the guidance with the same spiritual tone and principles:
+// 1. 🙏 Acknowledge their question with grace
+// 2. 💡 Provide helpful hints without giving away the solution until the user asks for it
+// 3. 🧘‍♂️ Use Krishna's wisdom and spiritual metaphors
+// 4. 🌸 Be encouraging and supportive
+// 5. 🕊️ Guide them towards self-discovery
+// 6. If the user asks for solution, then give him the solution with proper commented mistakes of his and correct version.
+
+// Remember: You are their spiritual coding mentor, helping them grow through understanding, not dependency.
+// `
+// }
+
+// // Updated helper functions to specify markdown preservation
+// export async function getAISuggestion(
+//   apiKey: string,
+//   problemHtml: string,
+//   language: Language,
+//   problemInfo: ProblemInfo,
+//   userQuery?: string,
+//   conversationHistory?: string
+// ): Promise<string> {
+//   try {
+//     let prompt: string
+
+//     if (conversationHistory && userQuery) {
+//       // This is a follow-up question
+//       prompt = generateFollowUpPrompt(
+//         conversationHistory,
+//         userQuery,
+//         language,
+//         problemInfo
+//       )
+//     } else {
+//       // This is initial suggestion or first question
+//       prompt = generateSuggestionPrompt(
+//         problemHtml,
+//         language,
+//         problemInfo,
+//         userQuery
+//       )
+//     }
+
+//     // Preserve markdown for AI suggestions since they likely contain formatted content
+//     const response = await callGeminiAPI(prompt, apiKey, true)
+
+//     return response
+//   } catch (error) {
+//     console.error('AI Suggestion error:', error)
+//     throw new Error(`Failed to get AI suggestion, ${error}`)
+//   }
+// }
+
+// // Helper to build conversation history for context
+// export function buildConversationHistory(
+//   messages: Array<{ type: 'user' | 'ai'; content: string }>
+// ): string {
+//   return messages
+//     .map((msg) =>
+//       msg.type === 'user'
+//         ? `DEVOTEE: ${msg.content}`
+//         : `AI'S GUIDANCE: ${msg.content}`
+//     )
+//     .join('\n\n')
+// }
+
 export function generateSuggestionPrompt(
   problemHtml: string,
   language: Language,
@@ -658,6 +724,7 @@ RESPONSE STYLE:
 - Use emojis appropriately ( 🙏 💎 🌸 📚 💡)
 - Keep responses concise but meaningful
 - Encourage independent thinking
+- Don't Consider yourself as Krishna but just a senior spiritual and coding mentor
 
 ${
   userQuery
@@ -675,17 +742,23 @@ export function generateFollowUpPrompt(
   previousConversation: string,
   userQuery: string,
   language: Language,
-  problemInfo: ProblemInfo
+  problemInfo: ProblemInfo,
+  problemHtml: string
 ): string {
   return `
 🕉️ CONTINUATION OF DIVINE GUIDANCE 🕉️
 
+ORIGINAL PROBLEM CONTEXT:
+- Title: ${problemInfo.title}
+- Difficulty: ${problemInfo.difficulty}
+- Language: ${language}
+- Tags: ${problemInfo.tags.join(', ')}
+
+PROBLEM STATEMENT:
+${problemHtml}
+
 PREVIOUS CONVERSATION:
 ${previousConversation}
-
-CURRENT PROBLEM:
-- Title: ${problemInfo.title}
-- Language: ${language}
 
 USER'S NEW QUESTION: ${userQuery}
 
@@ -697,11 +770,45 @@ Continue the guidance with the same spiritual tone and principles:
 5. 🕊️ Guide them towards self-discovery
 6. If the user asks for solution, then give him the solution with proper commented mistakes of his and correct version.
 
-Remember: You are their spiritual coding mentor, helping them grow through understanding, not dependency.
+Remember: You are their spiritual coding mentor, helping them grow through understanding, not dependency. Reference the previous conversation to maintain continuity.
 `
 }
 
-// Updated helper functions to specify markdown preservation
+// Helper to validate if context history should be used
+export function shouldUseContextHistory(
+  conversationHistory?: string,
+  userQuery?: string
+): boolean {
+  return !!(
+    (
+      conversationHistory &&
+      conversationHistory.trim() &&
+      userQuery &&
+      userQuery.trim() &&
+      conversationHistory.length > 10
+    ) // Minimum meaningful history length
+  )
+}
+
+// Enhanced helper to build conversation history with better formatting
+export function buildConversationHistory(
+  messages: Array<{ type: 'user' | 'ai'; content: string; timestamp?: string }>
+): string {
+  if (!messages || messages.length === 0) {
+    return ''
+  }
+
+  return messages
+    .filter((msg) => msg.content && msg.content.trim()) // Remove empty messages
+    .map((msg, index) => {
+      const prefix = msg.type === 'user' ? 'DEVOTEE' : 'MENTOR'
+      const timestamp = msg.timestamp ? ` (${msg.timestamp})` : ''
+      return `${prefix}${timestamp}: ${msg.content.trim()}`
+    })
+    .join('\n\n---\n\n') // Better separation between exchanges
+}
+
+// Single improved getAISuggestion function
 export async function getAISuggestion(
   apiKey: string,
   problemHtml: string,
@@ -713,13 +820,14 @@ export async function getAISuggestion(
   try {
     let prompt: string
 
-    if (conversationHistory && userQuery) {
-      // This is a follow-up question
+    if (shouldUseContextHistory(conversationHistory, userQuery)) {
+      // This is a follow-up question with valid history
       prompt = generateFollowUpPrompt(
-        conversationHistory,
-        userQuery,
+        conversationHistory!,
+        userQuery!,
         language,
-        problemInfo
+        problemInfo,
+        problemHtml
       )
     } else {
       // This is initial suggestion or first question
@@ -737,19 +845,6 @@ export async function getAISuggestion(
     return response
   } catch (error) {
     console.error('AI Suggestion error:', error)
-    throw new Error(`Failed to get AI suggestion, ${error}`)
+    throw new Error(`Failed to get AI suggestion: ${error}`)
   }
-}
-
-// Helper to build conversation history for context
-export function buildConversationHistory(
-  messages: Array<{ type: 'user' | 'ai'; content: string }>
-): string {
-  return messages
-    .map((msg) =>
-      msg.type === 'user'
-        ? `DEVOTEE: ${msg.content}`
-        : `AI'S GUIDANCE: ${msg.content}`
-    )
-    .join('\n\n')
 }

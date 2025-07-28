@@ -80,7 +80,7 @@ export function AISuggestionStep({
     } catch (error) {
       addMessage(
         'ai',
-        `🙏 Forgive me, dear devotee! Something went wrong. Krishna willing, please try again. ${error}`
+        `🙏 Forgive me, dear devotee! Something went wrong. Please try again. ${error}`
       )
     } finally {
       setIsProcessing(false)
@@ -123,13 +123,19 @@ export function AISuggestionStep({
 
       {/* Welcome Section - Shows when no messages */}
       {messages.length === 0 && (
-        <div className='text-center py-6 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg border border-orange-200' style={{padding: '2px'}}>
+        <div
+          className='text-center py-6 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg border border-orange-200'
+          style={{ padding: '2px' }}
+        >
           <div className='mb-3'>
             <span className='text-4xl'>🧘‍♂️</span>
           </div>
-          <h3 className='text-lg font-medium text-gray-800 mb-2'>
-            Seek Guidance
+          <h3 className='text-lg font-medium text-gray-800 '>
+            I'm CodeTatva
           </h3>
+          <h4 className='text-md font-normal text-gray-800 mb-2'>
+            Your Spiritual Coding Spirit
+          </h4>
           <p className='text-sm text-gray-600 mb-4'>
             Ask me anything about this problem - hints, approaches,
             explanations, or specific questions
@@ -224,7 +230,7 @@ export function AISuggestionStep({
       )}
 
       {/* Chat Input - Now always visible */}
-      <div className='space-y-3'>
+      <div className='space-y-5' style={{marginTop: 40}}>
         <div className='flex gap-2'>
           <textarea
             value={userInput}
@@ -254,26 +260,32 @@ export function AISuggestionStep({
 
         {/* Quick Actions - Always visible */}
         <div className='flex flex-wrap gap-2'>
+          {messages.length > 0 && (
+            <button
+              onClick={() => setUserInput('Can you give me another hint?')}
+              disabled={!apiKey}
+              className='px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50'
+            >
+              💡 Another Hint
+            </button>
+          )}
           <button
-            onClick={() => setUserInput('Can you give me a hint?')}
+            onClick={() => setUserInput("What's the time and space complexity of the approach?")}
             disabled={!apiKey}
             className='px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50'
           >
-            💡 Hint
+            ⏰ Time-Space Comp
           </button>
           <button
-            onClick={() => setUserInput("What's the time complexity?")}
+            onClick={() =>
+              setUserInput(
+                'Is there any Optimisation to the current approach or is there an another optimised approach?'
+              )
+            }
             disabled={!apiKey}
             className='px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50'
           >
-            ⏰ Time complexity
-          </button>
-          <button
-            onClick={() => setUserInput('What approach should I use?')}
-            disabled={!apiKey}
-            className='px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-gray-200 transition-colors disabled:opacity-50'
-          >
-            🎯 Approach
+            🎯 Optimisation
           </button>
           <button
             onClick={() => setUserInput('Can you explain the solution?')}
