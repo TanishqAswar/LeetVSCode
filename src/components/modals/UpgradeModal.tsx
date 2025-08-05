@@ -249,6 +249,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
         const response = await fetch(`${BACKEND_URL}/check-payment/${qrId}`)
         const data = await response.json()
 
+
         if (data.paid) {
           clearInterval(pollInterval)
           setPaymentStep('processing')
@@ -477,7 +478,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 </ul>
               </div>
               <div className='text-lg font-bold text-orange-600 mb-4'>
-                Only ₹299/month
+                Only ₹2.99/month
               </div>
             </div>
             <div className='flex gap-2 justify-center mb-4'>
@@ -521,12 +522,26 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                     type='email'
                     value={email}
                     onChange={(e) => {
-                      setEmail(e.target.value)
+                      const val = e.target.value
+                      setEmail(val)
                       setError(null)
+
+                      // Live email validation
+                      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                      if (val && !emailPattern.test(val)) {
+                        setError('Please enter a valid email address')
+                      }
                     }}
                     placeholder='your@email.com'
-                    className='w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
+                    className={`w-full p-3 border rounded-lg text-sm focus:ring-2 ${
+                      error
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-orange-500 focus:border-orange-500'
+                    }`}
                   />
+                  {error && (
+                    <p className='text-red-500 text-xs mt-1'>{error}</p>
+                  )}
                 </div>
 
                 {/* Payment Options */}
@@ -540,7 +555,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                     <div className='flex items-center justify-center gap-3'>
                       <div className='text-2xl'>📱</div>
                       <div className='text-left'>
-                        <p className='font-medium'>Pay ₹299 with QR Code</p>
+                        <p className='font-medium'>Pay ₹2.99 with QR Code</p>
                         <p className='text-xs opacity-90'>
                           UPI • PhonePe • GPay • Paytm
                         </p>
@@ -640,19 +655,36 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 </h3>
 
                 <div className='text-center mb-6'>
-                  {/* QR Code Display */}
+                  {/* QR Code Display - CROPPED VERSION */}
                   <div className='bg-white border-4 border-blue-200 rounded-lg p-4 mb-4 inline-block'>
-                    <img
-                      src={qrCodeData.image_url}
-                      alt='Razorpay QR Code'
-                      className='w-48 h-48 mx-auto'
-                      onError={(e) => {
-                        console.error('QR Code failed to load')
-                        setError(
-                          'Failed to load QR code. Please try payment link instead.'
-                        )
-                      }}
-                    />
+                    <div className='w-48 h-48 mx-auto overflow-hidden rounded-lg relative bg-white'>
+                      <img
+                        src={qrCodeData.image_url}
+                        alt='Razorpay QR Code'
+                        className='absolute'
+                        style={{
+                          clipPath: 'inset(40% 20% 37% 20%)',
+                          transform: 'scale(1.7)', // Zoom level (1 = no zoom)
+                          transformOrigin: 'center', // Zoom from center
+                          top: -150,
+                        }}
+                        onError={(e) => {
+                          console.error('QR Code failed to load')
+                          setError(
+                            'Failed to load QR code. Please try payment link instead.'
+                          )
+                        }}
+                      />
+
+                      {/* Fallback loading state - only shows when image fails */}
+                      <div className='absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg -z-10'>
+                        <div className='w-32 h-32 border-4 border-gray-300 border-dashed rounded-lg flex items-center justify-center'>
+                          <span className='text-gray-500 text-sm'>
+                            Loading QR...
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Payment Instructions */}
@@ -683,7 +715,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                       <div className='space-y-1 text-xs'>
                         <div className='flex justify-between'>
                           <span>Amount:</span>
-                          <span className='font-mono font-medium'>₹299</span>
+                          <span className='font-mono font-medium'>₹2.99</span>
                         </div>
                         <div className='flex justify-between'>
                           <span>Email:</span>
