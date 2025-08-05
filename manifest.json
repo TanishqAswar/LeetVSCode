@@ -3,7 +3,7 @@
   "name": "LeetVSCode",
   "version": "0.0.1",
   "description": "Generate driver code and extract solutions for competitive programming platforms",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage","tabs"],
   "host_permissions": [
     "https://leetcode.com/*",
     "https://www.leetcode.com/*",
@@ -18,7 +18,8 @@
     "https://hackerrank.com/*",
     "https://www.hackerrank.com/*",
     "https://atcoder.jp/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://buy.stripe.com/*"
   ],
   "action": {
     "default_popup": "dist/popup.html",

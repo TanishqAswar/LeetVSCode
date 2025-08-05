@@ -1,4 +1,4 @@
-// src/components/Popup.tsx (FIXED - Added default export)
+// src/components/Popup.tsx
 import React, { useEffect, useState } from 'react'
 import { Language, ProblemInfo, StepType } from '../types'
 import {
@@ -16,12 +16,14 @@ import {
 import { testApiConnection } from '../utils/aiUtils'
 
 import { useLocalStorage, useCurrentTab } from '../hooks/useCustomHooks'
+import { usePromptTracking } from '../hooks/usePromptTracking'
 import { IntroStep } from './steps/IntroStep'
 import { BoilerplateStep } from './steps/BoilerplateStep'
 import { GenerateStep } from './steps/GenerateStep'
 import { ExtractStep } from './steps/ExtractStep'
 import { SettingsStep } from './steps/SettingsStep'
 import { AISuggestionStep } from './steps/AISuggestionStep'
+import UpgradeModal from './modals/UpgradeModal'
 
 function Popup() {
   const [step, setStep] = useState<StepType>('intro')
@@ -33,13 +35,23 @@ function Popup() {
     tags: [],
   })
 
-  // Local storage hooks
+  // Local storage hooks - 1
   const [apiKey, setApiKey] = useLocalStorage('geminiApiKey', '')
   const [customBoilerplate, setCustomBoilerplate] = useLocalStorage(
     'customBoilerplate',
     ''
   )
   const [hasSeenIntro, setHasSeenIntro] = useLocalStorage('hasSeenIntro', false)
+
+  // Prompt tracking hook
+  const {
+    promptsUsed,
+    remainingPrompts,
+    isPremium,
+    isLoading: isTrackingLoading,
+    incrementPromptUsage,
+    setPremiumStatus,
+  } = usePromptTracking()
 
   // State for generated/extracted code
   const [driverCode, setDriverCode] = useState('')
@@ -51,6 +63,9 @@ function Popup() {
   const [suggestionMessages, setSuggestionMessages] = useState<
     Array<{ type: 'user' | 'ai'; content: string }>
   >([])
+
+  // State for upgrade modal
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const currentTab = useCurrentTab()
   const isPlatformPage = currentTab
@@ -96,8 +111,15 @@ function Popup() {
     }
   }
 
-  // Handle AI suggestions
+  // Handle AI suggestions with prompt tracking
   const handleGetSuggestion = async (userQuery?: string): Promise<string> => {
+    // Check if user has reached limit before making API call
+    if (!isPremium && remainingPrompts <= 0) {
+      throw new Error(
+        'Daily limit reached. Please upgrade for unlimited prompts!'
+      )
+    }
+
     let htmlContent = currentProblemHtml
 
     // If we don't have HTML content, fetch it
@@ -123,16 +145,40 @@ function Popup() {
         ? buildConversationHistory(suggestionMessages)
         : undefined
 
-    const response = await getAISuggestion(
-      apiKey,
-      htmlContent,
-      language,
-      problemInfo,
-      userQuery,
-      conversationHistory
-    )
+    try {
+      const response = await getAISuggestion(
+        apiKey,
+        htmlContent,
+        language,
+        problemInfo,
+        userQuery,
+        conversationHistory
+      )
 
-    return response
+      // Only increment usage after successful API call
+      await incrementPromptUsage()
+
+      return response
+    } catch (error) {
+      console.error('AI suggestion error:', error)
+      throw error
+    }
+  }
+
+  // Handle prompt usage tracking
+  const handlePromptUsed = async () => {
+    await incrementPromptUsage()
+  }
+
+  // Handle upgrade flow
+  const handleShowUpgrade = () => {
+    setShowUpgradeModal(true)
+  }
+
+  const handleUpgradeConfirm = () => {
+    // This will be triggered when the UpgradeModal successfully activates premium
+    setPremiumStatus(true)
+    setShowUpgradeModal(false)
   }
 
   const handleSupportClick = (type: 'support' | 'gita' | 'discuss') => {
@@ -149,6 +195,7 @@ function Popup() {
     const gitaLinks = [
       'https://gitadaily.com/', // Chaitanya Charan Prabhu's blog
       'https://www.youtube.com/watch?v=cBmpasCxlNI', // Janvi Mataji Bhajans
+      'https://youtu.be/gjFyOTNUB6E?si=stgZHBH6UOU_pkSE', // Hari Haraye Namah
       'https://youtu.be/ODJ3evaA5iA?si=EV2HRSfneCYb4dG6', // Gauranga Prabhu lectures
     ]
 
@@ -178,11 +225,6 @@ function Popup() {
     }
   }
 
-  // Test your API key
-  testApiConnection('your-api-key-here').then((result) => {
-    console.log('Test result:', result)
-  })
-
   // Setup completion
   const completeSetup = () => {
     setHasSeenIntro(true)
@@ -204,6 +246,18 @@ function Popup() {
       setSuggestionMessages([]) // Clear suggestion history
       alert('✅ All data reset!')
     }
+  }
+
+  // Show loading state while tracking data loads
+  if (isTrackingLoading) {
+    return (
+      <div className='w-96 h-64 flex items-center justify-center bg-gray-50'>
+        <div className='flex flex-col items-center gap-2'>
+          <div className='w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin'></div>
+          <p className='text-sm text-gray-600'>Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -263,6 +317,12 @@ function Popup() {
             isLoading={isLoading}
             onBack={() => setStep(isPlatformPage ? 'generate' : 'extract')}
             onGetSuggestion={handleGetSuggestion}
+            isPremium={isPremium}
+            promptsUsed={promptsUsed}
+            remainingPrompts={remainingPrompts}
+            freeLimit={10}
+            onPromptUsed={handlePromptUsed}
+            onShowUpgrade={handleShowUpgrade}
           />
         )}
         {step === 'settings' && (
@@ -336,25 +396,25 @@ function Popup() {
               {step !== 'intro' &&
                 step !== 'boilerplate' &&
                 step !== 'settings' &&
-                step !==
-                  'suggestions' &&(
-                    <div className='flex justify-center items-center w-full'>
-                      {/* AI Suggestion Button */}
-                      <div className='group relative max-w-xs'>
-                        <button
-                          onClick={() => setStep('suggestions')}
-                          disabled={!apiKey}
-                          className='px-6 py-2 h-9 bg-gray-600 text-white text-xs rounded-md transition-all duration-300 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800'
-                        >
-                          🧘‍♂️ Get AI Guidance
-                        </button>
-                        <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
-                          Get AI hints and ask for follow-ups
-                          <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black'></div>
-                        </div>
+                step !== 'suggestions' && (
+                  <div className='flex justify-center items-center w-full'>
+                    {/* AI Suggestion Button */}
+                    <div className='group relative max-w-xs'>
+                      <button
+                        onClick={() => setStep('suggestions')}
+                        className='px-6 py-2 h-9 bg-gray-600 text-white text-xs rounded-md transition-all duration-300 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800'
+                      >
+                        🧘‍♂️ Get AI Guidance
+                      </button>
+                      <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none w-40 text-center z-10 leading-relaxed'>
+                        {!isPremium && remainingPrompts <= 0
+                          ? 'Daily limit reached. Upgrade for unlimited prompts!'
+                          : 'Get AI hints and ask for follow-ups'}
+                        <div className='absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black'></div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
               {!apiKey && (
                 <p className='text-red-500 text-xs text-center'>
                   Please set your Gemini API key in settings to use AI features
@@ -364,6 +424,13 @@ function Popup() {
           </div>
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgrade={handleUpgradeConfirm}
+      />
     </div>
   )
 }
