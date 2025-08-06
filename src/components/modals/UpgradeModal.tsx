@@ -1,6 +1,7 @@
 // src/components/modals/UpgradeModal.tsx
 
 import React, { useState, useEffect } from 'react'
+import colors from 'colors'
 
 interface UpgradeModalProps {
   isOpen: boolean
@@ -23,18 +24,118 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const [qrCodeData, setQrCodeData] = useState<any>(null)
   const [orderData, setOrderData] = useState<any>(null)
   const [paymentId, setPaymentId] = useState('')
-  const [isCheckingPayment, setIsCheckingPayment] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentLinkUrl, setPaymentLinkUrl] = useState('')
+
+  // 🚨 NEW: Real-time payment tracking
+  const [sessionId, setSessionId] = useState('')
+  const [eventSourceRef, setEventSourceRef] =   useState<EventSource | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<
+    'disconnected' | 'connecting' | 'connected'
+  >('disconnected')
 
   const BACKEND_URL =
     process.env.NODE_ENV === 'development'
       ? 'http://localhost:3020'
       : 'http://localhost:3020' // Update this for production
 
+
+  // Generate session ID when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const newSessionId = `session_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`
+      setSessionId(newSessionId)
+      console.log('🆔 Generated session ID:', newSessionId)
+    } else {
+      // Cleanup when modal closes
+      if (eventSourceRef) {
+        console.log('🔌 Closing SSE connection on modal close'.bgRed)
+        eventSourceRef.close()
+        setEventSourceRef(null)
+      }
+      setConnectionStatus('disconnected')
+    }
+  }, [isOpen])
+
+  // Cleanup event source on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef) {
+        console.log('🔌 Cleaning up SSE connection on unmount'.bgYellow)
+        eventSourceRef.close()
+      }
+    }
+  }, [eventSourceRef])
+
   if (!isOpen) return null
 
-  // Method 1: Try QR Code first
+  // 🚨 NEW: Real-time payment listener using Server-Sent Events
+  const startRealTimePaymentListener = (sessionId: string) => {
+    if (eventSourceRef) {
+      eventSourceRef.close()
+    }
+
+    console.log('📡 Starting SSE connection for session:', sessionId)
+    setConnectionStatus('connecting')
+
+    const eventSource = new EventSource(
+      `${BACKEND_URL}/payment-status/${sessionId}`
+    )
+
+    eventSource.onopen = () => {
+      console.log('📡 SSE connection opened')
+      setConnectionStatus('connected')
+    }
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('📡 SSE message received:', data)
+
+        if (data.type === 'connected') {
+          setConnectionStatus('connected')
+          setError(null)
+        } else if (data.type === 'payment_success') {
+          console.log('🎉 Payment success received via SSE!')
+
+          // Payment successful! Auto-activate license
+          setLicenseKey(data.license_key)
+          setPaymentStep('processing')
+
+          // Show processing for a moment, then activate
+          setTimeout(async () => {
+            await activateLicenseKey(data.license_key)
+          }, 2000)
+
+          // Close the event source
+          eventSource.close()
+          setEventSourceRef(null)
+          setConnectionStatus('disconnected')
+        } else if (data.type === 'heartbeat') {
+          // Keep-alive heartbeat
+          console.log('💓 SSE heartbeat received')
+        }
+      } catch (error) {
+        console.error('❌ Error parsing SSE data:', error)
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('❌ SSE connection error:', error)
+      setConnectionStatus('disconnected')
+
+      // Don't auto-reconnect, let user retry manually
+      eventSource.close()
+      setEventSourceRef(null)
+    }
+
+    setEventSourceRef(eventSource)
+    return eventSource
+  }
+
+  // Method 1: Try QR Code first (UPDATED with real-time)
   const createQRPayment = async () => {
     if (!email) {
       setError('Please enter your email address')
@@ -52,6 +153,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
         },
         body: JSON.stringify({
           email: email,
+          session_id: sessionId, // 🚨 Include session ID
         }),
       })
 
@@ -71,8 +173,8 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
           })
           setPaymentId(data.qr_id)
 
-          // Start polling for QR payment status
-          startQRPaymentPolling(data.qr_id)
+          // 🚨 NEW: Start real-time listener instead of polling
+          startRealTimePaymentListener(sessionId)
         }
       } else {
         setError(data.error || 'Failed to create payment. Please try again.')
@@ -85,7 +187,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
     }
   }
 
-  // Method 2: Create Payment Link (Alternative)
+  // Method 2: Create Payment Link (UPDATED with real-time)
   const createPaymentLink = async () => {
     if (!email) {
       setError('Please enter your email address')
@@ -102,6 +204,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
         },
         body: JSON.stringify({
           email: email,
+          session_id: sessionId, // 🚨 Include session ID
         }),
       })
 
@@ -114,13 +217,11 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
         // Open payment link in new tab
         window.open(data.payment_url, '_blank')
 
-        // Show processing state and start checking
+        // Show processing state
         setPaymentStep('processing')
 
-        // Start polling for payment completion
-        setTimeout(() => {
-          startLicensePolling()
-        }, 5000)
+        // 🚨 NEW: Start real-time listener instead of polling
+        startRealTimePaymentListener(sessionId)
       } else {
         setError(
           data.error || 'Failed to create payment link. Please try again.'
@@ -136,7 +237,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
     }
   }
 
-  // Method 3: Standard Razorpay Integration (for fallback)
+  // Method 3: Standard Razorpay Integration (UPDATED with real-time)
   const createStandardPayment = async () => {
     if (!email) {
       setError('Please enter your email address')
@@ -153,6 +254,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
         },
         body: JSON.stringify({
           email: email,
+          session_id: sessionId, // 🚨 Include session ID
         }),
       })
 
@@ -161,6 +263,9 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
       if (response.ok && data.order_id) {
         setOrderData(data)
         setPaymentStep('standard')
+
+        // 🚨 NEW: Start real-time listener before opening Razorpay
+        startRealTimePaymentListener(sessionId)
 
         // Initialize Razorpay checkout
         initializeRazorpay(data)
@@ -177,7 +282,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
     }
   }
 
-  // Initialize Razorpay Checkout
+  // Initialize Razorpay Checkout (UPDATED)
   const initializeRazorpay = (orderData: any) => {
     const options = {
       key: orderData.key,
@@ -187,7 +292,11 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
       description: 'Premium Subscription',
       order_id: orderData.order_id,
       handler: function (response: any) {
-        verifyPayment(response)
+        // Payment completed, verification will be handled by webhook + SSE
+        setPaymentStep('processing')
+        console.log(
+          '💳 Razorpay payment completed, waiting for verification...'
+        )
       },
       prefill: {
         email: email,
@@ -197,7 +306,12 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
       },
       modal: {
         ondismiss: function () {
+          // If user closes modal, go back to email step
           setPaymentStep('email')
+          if (eventSourceRef) {
+            eventSourceRef.close()
+            setEventSourceRef(null)
+          }
         },
       },
     }
@@ -207,134 +321,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
     rzp.open()
   }
 
-  // Verify payment after successful transaction
-  const verifyPayment = async (response: any) => {
-    setPaymentStep('processing')
-
-    try {
-      const verifyResponse = await fetch(`${BACKEND_URL}/verify-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          razorpay_order_id: response.razorpay_order_id,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_signature: response.razorpay_signature,
-        }),
-      })
-
-      const data = await verifyResponse.json()
-
-      if (data.verified) {
-        // Payment verified, start checking for license
-        setTimeout(async () => {
-          await fetchLicenseFromBackend()
-        }, 3000)
-      } else {
-        setError('Payment verification failed. Please contact support.')
-        setPaymentStep('email')
-      }
-    } catch (error) {
-      console.error('Payment verification failed:', error)
-      setError('Failed to verify payment. Please contact support.')
-      setPaymentStep('email')
-    }
-  }
-
-  // Start polling for QR payment status
-  const startQRPaymentPolling = (qrId: string) => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch(`${BACKEND_URL}/check-payment/${qrId}`)
-        const data = await response.json()
-
-
-        if (data.paid) {
-          clearInterval(pollInterval)
-          setPaymentStep('processing')
-
-          // Wait for webhook to process and then fetch license
-          setTimeout(async () => {
-            await fetchLicenseFromBackend()
-          }, 5000)
-        }
-      } catch (error) {
-        console.error('QR Payment polling error:', error)
-      }
-    }, 3000) // Check every 3 seconds
-
-    // Stop polling after 30 minutes
-    setTimeout(() => {
-      clearInterval(pollInterval)
-      if (paymentStep === 'qr') {
-        setError('Payment timeout. Please try again or contact support.')
-        setPaymentStep('email')
-      }
-    }, 30 * 60 * 1000)
-  }
-
-  // Start polling for license (for payment link method)
-  const startLicensePolling = () => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch(
-          `${BACKEND_URL}/license?email=${encodeURIComponent(email)}`
-        )
-
-        if (response.ok) {
-          const data = await response.json()
-          clearInterval(pollInterval)
-          setLicenseKey(data.key)
-          await activateLicenseKey(data.key)
-        }
-      } catch (error) {
-        console.error('License polling error:', error)
-      }
-    }, 5000) // Check every 5 seconds
-
-    // Stop polling after 15 minutes
-    setTimeout(() => {
-      clearInterval(pollInterval)
-      if (paymentStep === 'processing') {
-        setError(
-          'License processing is taking longer than expected. Please check your email or contact support.'
-        )
-        setPaymentStep('email')
-        setShowPayment(true)
-      }
-    }, 15 * 60 * 1000)
-  }
-
-  // Fetch license from backend
-  const fetchLicenseFromBackend = async () => {
-    try {
-      const response = await fetch(
-        `${BACKEND_URL}/license?email=${encodeURIComponent(email)}`
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        setLicenseKey(data.key)
-        await activateLicenseKey(data.key)
-      } else {
-        setError(
-          'License is being processed. Please check your email or enter the license key manually.'
-        )
-        setPaymentStep('email')
-        setShowPayment(true)
-      }
-    } catch (error) {
-      console.error('Failed to fetch license:', error)
-      setError(
-        'Failed to retrieve license. Please check your email for the license key.'
-      )
-      setPaymentStep('email')
-      setShowPayment(true)
-    }
-  }
-
-  // Activate license key
+  // Activate license key (UNCHANGED)
   const activateLicenseKey = async (key: string) => {
     setIsActivating(true)
     setError(null)
@@ -379,40 +366,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
     setLicenseKey(testKey)
   }
 
-  // Manual payment check for QR codes
-  const manualPaymentCheck = async () => {
-    setIsCheckingPayment(true)
-    setError(null)
+  // 🚨 REMOVED: Manual payment check (replaced by real-time)
+  // 🚨 REMOVED: All polling functions
 
-    try {
-      if (paymentId && qrCodeData) {
-        const response = await fetch(
-          `${BACKEND_URL}/check-payment/${paymentId}`
-        )
-        const data = await response.json()
-
-        if (data.paid) {
-          setPaymentStep('processing')
-          setTimeout(async () => {
-            await fetchLicenseFromBackend()
-          }, 2000)
-        } else {
-          setError(
-            'Payment not detected yet. Please try again after completing the payment.'
-          )
-        }
-      } else {
-        await fetchLicenseFromBackend()
-      }
-    } catch (error) {
-      console.error('Manual payment check failed:', error)
-      setError('Failed to check payment status. Please try again.')
-    }
-
-    setIsCheckingPayment(false)
-  }
-
-  // Resend license email
+  // Resend license email (UNCHANGED)
   const resendLicense = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/resend-license`, {
@@ -451,6 +408,30 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 Resend License Email
               </button>
             )}
+          </div>
+        )}
+
+        {/* 🚨 NEW: Connection Status Indicator */}
+        {connectionStatus !== 'disconnected' && (
+          <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4'>
+            <div className='flex items-center gap-2'>
+              {connectionStatus === 'connecting' && (
+                <>
+                  <div className='w-3 h-3 bg-blue-400 rounded-full animate-pulse'></div>
+                  <span className='text-xs text-blue-700'>
+                    Connecting to payment system...
+                  </span>
+                </>
+              )}
+              {connectionStatus === 'connected' && (
+                <>
+                  <div className='w-3 h-3 bg-green-400 rounded-full'></div>
+                  <span className='text-xs text-green-700'>
+                    ✅ Connected - Waiting for payment...
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -690,7 +671,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                   {/* Payment Instructions */}
                   <div className='space-y-3'>
                     <p className='text-sm text-gray-700 font-medium'>
-                      Scan with any UPI app to pay ₹299
+                      Scan with any UPI app to pay ₹2.99
                     </p>
                     <div className='flex justify-center gap-3 text-xs text-gray-600'>
                       <span className='flex items-center gap-1'>
@@ -730,38 +711,18 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Status Indicator */}
-                    <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4'>
+                    {/* 🚨 NEW: Real-time Status Indicator */}
+                    <div className='bg-green-50 border border-green-200 rounded-lg p-3 mt-4'>
                       <div className='flex items-center justify-center gap-2'>
-                        <div className='w-3 h-3 bg-yellow-400 rounded-full animate-pulse'></div>
-                        <span className='text-xs text-yellow-700'>
-                          Waiting for payment...
+                        <div className='w-3 h-3 bg-green-400 rounded-full animate-pulse'></div>
+                        <span className='text-xs text-green-700'>
+                          ⚡ Real-time payment detection active
                         </span>
                       </div>
+                      <p className='text-xs text-gray-600 mt-1 text-center'>
+                        Payment will be detected automatically after you pay
+                      </p>
                     </div>
-                  </div>
-
-                  {/* Manual Check Button */}
-                  <div className='mt-6 space-y-2'>
-                    <button
-                      onClick={manualPaymentCheck}
-                      disabled={isCheckingPayment}
-                      className='w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-sm font-medium'
-                    >
-                      {isCheckingPayment ? (
-                        <div className='flex items-center justify-center gap-2'>
-                          <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
-                          Checking Payment...
-                        </div>
-                      ) : (
-                        '🔄 Check Payment Status'
-                      )}
-                    </button>
-
-                    <p className='text-xs text-gray-500'>
-                      Payment not detecting automatically? Click above to check
-                      manually.
-                    </p>
                   </div>
                 </div>
 
@@ -771,6 +732,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                       setPaymentStep('email')
                       setQrCodeData(null)
                       setError(null)
+                      if (eventSourceRef) {
+                        eventSourceRef.close()
+                        setEventSourceRef(null)
+                      }
                     }}
                     className='px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm'
                   >
@@ -801,6 +766,18 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                   >
                     Open Payment Window
                   </button>
+
+                  {/* 🚨 NEW: Real-time Status */}
+                  {connectionStatus === 'connected' && (
+                    <div className='bg-green-50 border border-green-200 rounded-lg p-3 mt-4'>
+                      <div className='flex items-center justify-center gap-2'>
+                        <div className='w-3 h-3 bg-green-400 rounded-full animate-pulse'></div>
+                        <span className='text-xs text-green-700'>
+                          ⚡ Monitoring payment in real-time
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className='flex gap-2 justify-center'>
@@ -809,6 +786,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                       setPaymentStep('email')
                       setOrderData(null)
                       setError(null)
+                      if (eventSourceRef) {
+                        eventSourceRef.close()
+                        setEventSourceRef(null)
+                      }
                     }}
                     className='px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm'
                   >
